@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   ConflictException,
   Injectable,
@@ -8,6 +9,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { User } from '@prisma/client';
 import { RegisterUserDTO } from './dtos/registerUser.dto';
 import * as bcrypt from 'bcrypt';
+import { UpdateUserDTO } from './dtos/updateUser.dto';
 
 @Injectable()
 export class UserService {
@@ -60,10 +62,92 @@ export class UserService {
       });
     }
 
-    return newUser;
+    const { password, createdAt, updatedAt, deletedAt, ...dataNewUser } =
+      newUser;
+
+    return dataNewUser as User;
   }
 
-  async findUserByID(userId: number) {
+  async update(
+    userId: number,
+    updateUser: UpdateUserDTO,
+  ): Promise<User | null> {
+    const validateUser = await this.findUserByID(userId);
+
+    if (!validateUser)
+      throw new NotFoundException('Usuário não encontrado!', {
+        cause: new Error(),
+        description:
+          'Usuário não encontrado com o ID fornecido, verifique e envie novamente!',
+      });
+
+    if (updateUser.email) {
+      const validateEmail = await this.prisma.user.findFirst({
+        where: {
+          email: updateUser.email,
+          deletedAt: null,
+          NOT: { id: userId },
+        },
+      });
+
+      if (validateEmail)
+        throw new ConflictException('Email já cadastrado!', {
+          cause: new Error(),
+          description:
+            'Existe um usuário com esse email cadastrado, insira um email diferente e tente novamente!',
+        });
+    }
+
+    if (updateUser.phone) {
+      const validatePhone = await this.prisma.user.findFirst({
+        where: {
+          email: updateUser.phone,
+          deletedAt: null,
+          NOT: { id: userId },
+        },
+      });
+
+      if (validatePhone)
+        throw new ConflictException('Telefone já cadastrado!', {
+          cause: new Error(),
+          description:
+            'Existe um usuário com esse telefone cadastrado, insira um telefone diferente e tente novamente!',
+        });
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...updateUser,
+      },
+    });
+
+    if (!updatedUser)
+      throw new BadGatewayException('Os dados do usuário não foi atualizado!', {
+        cause: new Error(),
+        description:
+          'Houve um erro ao tentar atualizar o usuário, tente novamente mais tarde.',
+      });
+
+    const { password, createdAt, updatedAt, deletedAt, ...dataUserUpdated } =
+      updatedUser;
+
+    return dataUserUpdated as User;
+  }
+
+  async listUsers(): Promise<User[] | []> {
+    const users = await this.prisma.user.findMany({
+      where: { deletedAt: null },
+    });
+
+    return users.map((user) => {
+      const { password, ...datasUsers } = user;
+
+      return datasUsers as User;
+    });
+  }
+
+  async findUserByID(userId: number): Promise<User | null> {
     const validateUser = await this.prisma.user.findFirst({
       where: { id: userId, deletedAt: null },
     });
@@ -76,20 +160,42 @@ export class UserService {
 
     const { password, createdAt, updatedAt, deletedAt, ...data } = validateUser;
 
-    return data;
+    return data as User;
   }
 
-  async findUserByEmail(email: string, includePassword = false): Promise<User | null> {
+  async findUserByEmail(
+    email: string,
+    includePassword = false,
+  ): Promise<User | null> {
     const validateEmail = await this.prisma.user.findFirst({
       where: { email, deletedAt: null },
     });
 
-    if(!validateEmail) return null;
+    if (!validateEmail) return null;
 
-    if(includePassword) return validateEmail as User;
+    if (includePassword) return validateEmail as User;
 
-    const { password, createdAt, updatedAt, deletedAt, ...data } = validateEmail;
+    const { password, createdAt, updatedAt, deletedAt, ...data } =
+      validateEmail;
 
     return data as User;
+  }
+
+  async delete(userId: number): Promise<{ message: string}> {
+    const validateUser = await this.findUserByID(userId);
+
+    if (!validateUser)
+      throw new NotFoundException('Usuário não encontrado!', {
+        cause: new Error(),
+        description:
+          'Usuário não foi encontrado, verifique o ID enviado e tente novamente.',
+      });
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { deletedAt: new Date() },
+    });
+
+    return { message: 'Usuário deletado com sucesso!' };
   }
 }
