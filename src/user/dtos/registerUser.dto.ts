@@ -1,7 +1,5 @@
 import {
-  IsBoolean,
   IsEmail,
-  IsJWT,
   IsNotEmpty,
   IsPhoneNumber,
   IsString,
@@ -23,6 +21,5 @@ export class RegisterUserDTO {
 
   @IsNotEmpty()
   @IsStrongPassword()
-  @IsJWT()
   password: string;
 }
