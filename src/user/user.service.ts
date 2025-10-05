@@ -10,10 +10,14 @@ import { User } from '@prisma/client';
 import { RegisterUserDTO } from './dtos/registerUser.dto';
 import * as bcrypt from 'bcrypt';
 import { UpdateUserDTO } from './dtos/updateUser.dto';
+import { UserRoleService } from 'src/user-role/user-role.service';
 
 @Injectable()
 export class UserService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private userRolService: UserRoleService,
+  ) {}
 
   async create(registerUser: RegisterUserDTO): Promise<User | null> {
     const validateEmail = await this.prisma.user.findFirst({
@@ -72,14 +76,7 @@ export class UserService {
     userId: number,
     updateUser: UpdateUserDTO,
   ): Promise<User | null> {
-    const validateUser = await this.findUserByID(userId);
-
-    if (!validateUser)
-      throw new NotFoundException('Usuário não encontrado!', {
-        cause: new Error(),
-        description:
-          'Usuário não encontrado com o ID fornecido, verifique e envie novamente!',
-      });
+    await this.findUserByID(userId);
 
     if (updateUser.email) {
       const validateEmail = await this.prisma.user.findFirst({
@@ -122,13 +119,6 @@ export class UserService {
       },
     });
 
-    if (!updatedUser)
-      throw new BadGatewayException('Os dados do usuário não foi atualizado!', {
-        cause: new Error(),
-        description:
-          'Houve um erro ao tentar atualizar o usuário, tente novamente mais tarde.',
-      });
-
     const { password, createdAt, updatedAt, deletedAt, ...dataUserUpdated } =
       updatedUser;
 
@@ -163,6 +153,28 @@ export class UserService {
     return data as User;
   }
 
+  async findByIdWithRoles(id: number) {
+    const user = await this.prisma.user.findFirst({
+      where: { id },
+      include: {
+        roles: {
+          include: {
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!user)
+      throw new NotFoundException('ID inválido.', {
+        cause: new Error(),
+        description:
+          'Usuário não encontrado, id inválido, verifique e tente novamente.',
+      });
+
+    return user;
+  }
+
   async findUserByEmail(
     email: string,
     includePassword = false,
@@ -181,7 +193,7 @@ export class UserService {
     return data as User;
   }
 
-  async delete(userId: number): Promise<{ message: string}> {
+  async deleteMyAccount(userId: number): Promise<{ message: string }> {
     const validateUser = await this.findUserByID(userId);
 
     if (!validateUser)
@@ -195,6 +207,8 @@ export class UserService {
       where: { id: userId },
       data: { deletedAt: new Date() },
     });
+
+    await this.userRolService.deleteUserRole(userId);
 
     return { message: 'Usuário deletado com sucesso!' };
   }
