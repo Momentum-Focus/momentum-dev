@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # Banco de dados PostgreSQL para desenvolvimento
+  postgres:
+    image: postgres:15-alpine
+    container_name: momentum-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: momentum_dev
+      POSTGRES_USER: momentum_user
+      POSTGRES_PASSWORD: momentum_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - momentum-dev-network
+
+  # Aplicação NestJS para desenvolvimento
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: momentum-app-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://momentum_user:momentum_password@postgres:5432/momentum_dev?schema=public
+      DIRECT_URL: postgresql://momentum_user:momentum_password@postgres:5432/momentum_dev?schema=public
+      JWT_SECRET: dev-jwt-secret-key
+    ports:
+      - "3000:3000"
+      - "9229:9229"  # Porta para debug
+    depends_on:
+      - postgres
+    networks:
+      - momentum-dev-network
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./uploads:/app/uploads
+    command: npm run start:dev
+
+  # Redis para desenvolvimento
+  redis:
+    image: redis:7-alpine
+    container_name: momentum-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - momentum-dev-network
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+
+networks:
+  momentum-dev-network:
+    driver: bridge

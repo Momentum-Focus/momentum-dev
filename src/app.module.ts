@@ -7,9 +7,17 @@ import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { RoleModule } from './role/role.module';
 import { UserRoleModule } from './user-role/user-role.module';
+import { DailyLogsModule } from './daily-logs/daily-logs.module';
+import { SettingsFocusModule } from './settings-focus/settings-focus.module';
+import { StudySessionsModule } from './study-sessions/study-sessions.module';
+import { LogsModule } from './logs/logs.module';
+import { ReportModule } from './report/report.module';
+import { ProjectModule } from './project/project.module';
+import { NotificationModule } from './notification/notification.module';
+import { PlanModule } from './plan/plan.module';
 
 @Module({
-  imports: [TasksModule, PrismaModule, UserModule, AuthModule, RoleModule, UserRoleModule],
+  imports: [TasksModule, PrismaModule, UserModule, AuthModule, RoleModule, UserRoleModule, DailyLogsModule, SettingsFocusModule, StudySessionsModule, LogsModule, ReportModule, ProjectModule, NotificationModule, PlanModule],
   controllers: [AppController],
   providers: [AppService],
 })

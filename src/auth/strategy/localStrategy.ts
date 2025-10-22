@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { Strategy } from 'passport-local';
 import { PassportStrategy } from '@nestjs/passport';
-import { AuthService } from './auth.service';
+import { AuthService } from '../auth.service';
 
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {
@@ -15,7 +15,8 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     if (!user)
       throw new UnauthorizedException('Email/Senha inválido!', {
         cause: new Error(),
-        description: 'O email ou a senha estão incorretos, altere e tente novamente.',
+        description:
+          'O email ou a senha estão incorretos, altere e tente novamente.',
       });
 
     return user;

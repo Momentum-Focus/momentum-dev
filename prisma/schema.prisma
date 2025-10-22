@@ -39,6 +39,8 @@ model User {
   reports                 Report[]
   media                   Media[]
   studySessions           StudySession[]
+  projects                Project[]
+  subscriptions           Subscription?
 
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
@@ -121,6 +123,8 @@ model Task {
   id                       Int                  @id @default(autoincrement())                 // Identificador único da tarefa
   userId                   Int
   user                     User                 @relation(fields: [userId], references: [id])
+  projectId                Int?
+  project                  Project?             @relation(fields: [projectId], references: [id])
   title                    String                                                             // Título da tarefa
   description              String?                                                            // Descrição detalhada da tarefa
   priority                 TaskPriority         @default(MEDIUM)                              // Prioridade da tarefa
@@ -134,6 +138,30 @@ model Task {
   createdAt                DateTime             @default(now())
   updatedAt                DateTime             @updatedAt
   deletedAt                DateTime?
+}
+
+enum ProjectStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model Project {
+  id          Int            @id @default(autoincrement()) // Identificador único do projeto
+  name        String                                         // Nome do projeto (ex: "TCC - Capítulo 1")
+  description String?                                        // Descrição opcional detalhada do projeto
+  status      ProjectStatus  @default(NOT_STARTED)           // Status atual do projeto (usando o Enum)
+  dueDate     DateTime?                                      // Data limite opcional para conclusão do projeto
+  completedAt DateTime?                                      // Data em que o projeto foi marcado como concluído
+  color       String?                                        // Cor associada ao projeto (ex: #FF5733) para UI
+
+  userId      Int
+  user        User           @relation(fields: [userId], references: [id])
+  tasks       Task[]                                         // Lista de tarefas associadas a este projeto
+
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?                                      // Para soft delete
 }
 
 enum SessionType {
@@ -172,6 +200,86 @@ model DailyLog {
   deletedAt               DateTime?
 
   @@unique([userId, date])
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+  // LIFETIME // Opcional: Para acesso vitalício
+}
+
+model Plan {
+  id            Int            @id @default(autoincrement()) // Identificador único do plano
+  name          String         @unique                       // Nome do plano (ex: "Pro", "Free")
+  description   String?                                      // Descrição opcional do plano
+  price         Decimal?                                     // Preço do plano (Decimal para valores monetários, nulo para planos gratuitos)
+  billingCycle  BillingCycle?                                // Ciclo de cobrança (Mensal, Anual - nulo para gratuitos)
+  isActive      Boolean        @default(true)                // Flag para ativar/desativar o plano
+
+  features      PlanFeature[]                                // Lista de funcionalidades incluídas neste plano
+  subscriptions Subscription[]                               // Lista de assinaturas ativas deste plano
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?                                    // Para soft delete
+}
+
+model Feature {
+  id          Int           @id @default(autoincrement()) // Identificador único da funcionalidade
+  code        String        @unique                       // Código único para a funcionalidade (ex: "VIDEO_UPLOAD", "UNLIMITED_PROJECTS")
+  name        String                                      // Nome amigável da funcionalidade
+  description String?                                     // Descrição opcional
+
+  plans       PlanFeature[]                               // Lista de planos que incluem esta funcionalidade
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+}
+
+model PlanFeature {
+  id        Int       @id @default(autoincrement()) // Identificador único da relação plano-funcionalidade
+
+  planId    Int
+  plan      Plan      @relation(fields: [planId], references: [id])
+  
+  featureId Int
+  feature   Feature   @relation(fields: [featureId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([planId, featureId]) // Garante que uma funcionalidade só pode ser adicionada uma vez a um plano
+}
+
+enum SubscriptionStatus {
+  ACTIVE      // Assinatura válida e paga
+  CANCELED    // Cancelada pelo usuário, pode ainda estar ativa até o fim do período
+  PAST_DUE    // Falha no pagamento
+  INCOMPLETE  // Pagamento inicial pendente
+  TRIALING    // Período de teste gratuito
+}
+
+model Subscription {
+  id             Int                @id @default(autoincrement()) // Identificador único da assinatura
+  status         SubscriptionStatus                              // Status atual da assinatura (Ativa, Cancelada, etc.)
+  startDate      DateTime                                        // Data de início da assinatura (ou do período atual)
+  endDate        DateTime?                                       // Data de término do período de cobrança atual (ou da assinatura, se cancelada)
+  trialEndDate   DateTime?                                       // Data de término do período de teste, se aplicável
+  
+  userId         Int                @unique                       // Geralmente um usuário tem apenas uma assinatura ativa por vez
+  user           User               @relation(fields: [userId], references: [id])
+
+  planId         Int
+  plan           Plan               @relation(fields: [planId], references: [id])
+
+  // Opcional: IDs de provedores de pagamento (Stripe, etc.)
+  // stripeSubscriptionId String? @unique
+  // stripeCustomerId     String? @unique
+
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  deletedAt      DateTime?                                       // Para soft delete
 }
 
 enum LogActionType {
