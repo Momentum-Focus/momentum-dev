@@ -5,12 +5,11 @@ import {
   IsInt,
   IsNotEmpty,
   IsDate,
-  IsUUID,
 } from 'class-validator';
 
 export class CreateTaskDTO {
   @IsNotEmpty()
-  @IsUUID()
+  @IsInt()
   userId: number;
 
   @IsNotEmpty()
