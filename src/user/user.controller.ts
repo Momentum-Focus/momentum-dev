@@ -9,10 +9,11 @@ import {
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UpdateUserDTO } from './dtos/updateUser.dto';
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles/roles.guard';
 import { Roles } from 'src/auth/roles/roles.decorator';
 import { Role } from 'src/auth/roles/role.enum';
+import { JwtAuthGuard } from 'src/auth/strategy/jwt-auth.guard';
+import type { Request } from 'express';
 
 @Controller('user')
 export class UserController {
@@ -35,12 +36,19 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  detailProfile(@Req() req: Request) {
+  detailProfile(@Req() req: any) {
     const userProfile = req.user;
 
-    delete userProfile.password;
+    const {
+      password,
+      createdAt,
+      updatedAt,
+      deletedAt,
+      roles,
+      ...userProfileData
+    } = userProfile;
 
-    return userProfile;
+    return userProfileData;
   }
 
   @UseGuards(JwtAuthGuard)

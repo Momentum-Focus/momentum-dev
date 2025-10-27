@@ -1,5 +1,4 @@
 import {
-  BadGatewayException,
   BadRequestException,
   ConflictException,
   Injectable,
@@ -16,7 +15,7 @@ import { UserRoleService } from 'src/user-role/user-role.service';
 export class UserService {
   constructor(
     private prisma: PrismaService,
-    private userRolService: UserRoleService,
+    private userRoleService: UserRoleService,
   ) {}
 
   async create(registerUser: RegisterUserDTO): Promise<User | null> {
@@ -137,7 +136,7 @@ export class UserService {
     });
   }
 
-  async findUserByID(userId: number): Promise<User | null> {
+  async findUserByID(userId: number): Promise<User> {
     const validateUser = await this.prisma.user.findFirst({
       where: { id: userId, deletedAt: null },
     });
@@ -208,7 +207,7 @@ export class UserService {
       data: { deletedAt: new Date() },
     });
 
-    await this.userRolService.deleteUserRole(userId);
+    await this.userRoleService.deleteUserRolesByUserId(userId);
 
     return { message: 'Usuário deletado com sucesso!' };
   }
