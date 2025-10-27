@@ -1,23 +1,19 @@
 import { Module } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { UserService } from 'src/user/user.service';
-import { RoleService } from 'src/role/role.service';
-import { UserRoleService } from 'src/user-role/user-role.service';
-import { LocalStrategy } from './local.strategy';
 import { UserModule } from 'src/user/user.module';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { RoleModule } from 'src/role/role.module';
 import { UserRoleModule } from 'src/user-role/user-role.module';
-import { JwtStrategy } from './jwt.strategy';
-import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles/roles.guard';
+import { JwtAuthGuard } from './strategy/jwt-auth.guard';
+import { JwtStrategy } from './strategy/jwt.strategy';
+import { LocalStrategy } from './strategy/localStrategy';
 
 @Module({
   imports: [
     UserModule,
-    AuthModule,
     RoleModule,
     UserRoleModule,
     PassportModule,
@@ -29,14 +25,11 @@ import { RolesGuard } from './roles/roles.guard';
   controllers: [AuthController],
   providers: [
     AuthService,
-    UserService,
-    RoleService,
     RolesGuard,
-    UserRoleService,
     LocalStrategy,
     JwtStrategy,
     JwtAuthGuard,
   ],
+  exports: [AuthService, JwtAuthGuard],
 })
-
 export class AuthModule {}

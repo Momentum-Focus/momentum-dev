@@ -1,13 +1,7 @@
-import {
-  Body,
-  Controller,
-  Post,
-  UseGuards,
-  Request
-} from '@nestjs/common';
+import { Body, Controller, Post, UseGuards, Request } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { RegisterUserDTO } from 'src/user/dtos/registerUser.dto';
 import { AuthService } from './auth.service';
-import { AuthGuard } from '@nestjs/passport';
 
 @Controller('auth')
 export class AuthController {
@@ -15,22 +9,14 @@ export class AuthController {
 
   @Post('/register')
   register(@Body() registerUser: RegisterUserDTO) {
-    const data = this.authService.register(registerUser);
-
-    return {
-      message: 'Usuario cadastrado com sucesso!',
-      user: data,
-    };
+    return this.authService.register(registerUser);
   }
 
   @UseGuards(AuthGuard('local'))
   @Post('/login')
   login(@Request() req: any) {
-    const data = this.authService.login(req.user)
-
-    return {
-        message: 'Usuario logado com sucesso!',
-        user: data
-    }
+    // req.user foi validado pelo LocalStrategy
+    // Agora só precisamos gerar o token
+    return this.authService.generateToken(req.user);
   }
 }

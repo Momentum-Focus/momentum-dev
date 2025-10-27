@@ -9,7 +9,6 @@ import { JwtService } from '@nestjs/jwt';
 import { UserService } from 'src/user/user.service';
 import { RoleService } from 'src/role/role.service';
 import { UserRoleService } from 'src/user-role/user-role.service';
-import { LoginUserDTO } from './dto/loginUser.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -25,51 +24,13 @@ export class AuthService {
   async validateUser(email: string, pass: string): Promise<any> {
     const user = await this.userService.findUserByEmail(email, true);
 
-    if (!user) return null;
+    if (!user || !user.password) return null;
 
-    await bcrypt.compare(pass, user.password);
+    const isMatch = await bcrypt.compare(pass, user.password);
+
+    if (!isMatch) return null;
 
     const { password, createdAt, updatedAt, deletedAt, ...data } = user;
-
-    return data;
-  }
-
-  async login(loginUser: LoginUserDTO) {
-    const validateEmail = await this.prisma.user.findFirst({
-      where: { email: loginUser.email, deletedAt: null },
-    });
-
-    if (!validateEmail)
-      throw new NotFoundException('Email não encontrado', {
-        cause: new Error(),
-        description:
-          'Nenhum usuario cadastrado com esse email. Por favor insira outro email.',
-      });
-
-    const validPassword = await bcrypt.compare(
-      loginUser.password,
-      validateEmail.password,
-    );
-
-    if (!validPassword)
-      throw new BadRequestException('Senha incorreta!', {
-        cause: new Error(),
-        description: 'A senha que o usario inseriu está incorreta!',
-      });
-
-    const payload = { sub: validateEmail.id, email: validateEmail.email };
-
-    const token = await this.jwtService.signAsync(payload);
-
-    const {
-      password: __,
-      createdAt,
-      updatedAt,
-      deletedAt,
-      ...loginData
-    } = validateEmail;
-
-    const data = { ...loginData, token };
 
     return data;
   }
@@ -103,12 +64,27 @@ export class AuthService {
     const { password, createdAt, updatedAt, deletedAt, ...registerData } =
       registedUser;
 
-    const payload = { email: registerData.email, password };
+    // Gere um token para o usuário recém-criado
+    const payload = { sub: registerData.id, email: registerData.email };
 
-    const login = await this.login(payload);
+    const token = await this.jwtService.signAsync(payload);
 
-    const data = { registerData, token: login.token };
+    return {
+      message: 'Usuario cadastrado com sucesso!',
+      user: registerData,
+      token,
+    };
+  }
 
-    return data;
+  async generateToken(user: any) {
+    const payload = { sub: user.id, email: user.email };
+
+    const token = await this.jwtService.signAsync(payload);
+
+    return {
+      message: 'Usuario logado com sucesso!',
+      user,
+      token,
+    };
   }
 }
