@@ -40,65 +40,87 @@ start() {
     check_docker
     create_env_file
     
-    print_message "📦 Construindo e iniciando containers..." $YELLOW
-    docker-compose up --build -d
+    print_message "📦 Construindo e iniciando containers em modo desenvolvimento..." $YELLOW
+    docker-compose -f docker-compose.dev.yml up --build -d
     
-    print_message "⏳ Aguardando serviços ficarem prontos..." $YELLOW
-    sleep 10
+    print_message "⏳ Aguardando serviço ficar pronto..." $YELLOW
+    sleep 5
     
-    print_message "🗄️ Executando migrações do Prisma..." $YELLOW
-    docker-compose exec app npx prisma migrate deploy
+    print_message "🗄️ Executando migrações do Prisma no Supabase..." $YELLOW
+    docker-compose -f docker-compose.dev.yml exec app npx prisma migrate deploy
     
     print_message "🌱 Executando seed do banco de dados..." $YELLOW
-    docker-compose exec app npm run seed
+    docker-compose -f docker-compose.dev.yml exec app npm run seed
     
     print_message "✅ Ambiente iniciado com sucesso!" $GREEN
     print_message "🌐 Aplicação disponível em: http://localhost:3000" $GREEN
-    print_message "🗄️ PostgreSQL disponível em: localhost:5432" $GREEN
-    print_message "🔴 Redis disponível em: localhost:6379" $GREEN
+    print_message "🗄️ Usando banco de dados Supabase (remoto)" $GREEN
 }
 
 # Função para parar os containers
 stop() {
     print_message "🛑 Parando containers..." $YELLOW
-    docker-compose down
+    docker-compose -f docker-compose.dev.yml down
     print_message "✅ Containers parados!" $GREEN
 }
 
 # Função para reiniciar os containers
 restart() {
     print_message "🔄 Reiniciando containers..." $YELLOW
-    docker-compose down
-    docker-compose up --build -d
+    docker-compose -f docker-compose.dev.yml down
+    docker-compose -f docker-compose.dev.yml up --build -d
     print_message "✅ Containers reiniciados!" $GREEN
 }
 
 # Função para ver logs
 logs() {
     if [ -n "$1" ]; then
-        docker-compose logs -f "$1"
+        docker-compose -f docker-compose.dev.yml logs -f "$1"
     else
-        docker-compose logs -f
+        docker-compose -f docker-compose.dev.yml logs -f
     fi
 }
 
 # Função para executar comandos no container da aplicação
 exec() {
-    docker-compose exec app "$@"
+    docker-compose -f docker-compose.dev.yml exec app "$@"
 }
 
 # Função para resetar o banco de dados
 reset_db() {
     print_message "🗑️ Resetando banco de dados..." $YELLOW
-    docker-compose exec app npx prisma migrate reset --force
-    docker-compose exec app npm run seed
+    docker-compose -f docker-compose.dev.yml exec app npx prisma migrate reset --force
+    docker-compose -f docker-compose.dev.yml exec app npm run seed
     print_message "✅ Banco de dados resetado!" $GREEN
+}
+
+# Função para limpar completamente o Docker (reverter tudo)
+clean() {
+    print_message "🧹 Limpando completamente o ambiente Docker..." $YELLOW
+    print_message "⚠️  Esta ação vai remover containers, volumes e imagens DESTE projeto!" $RED
+    read -p "Tem certeza? (s/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Ss]$ ]]; then
+        print_message "❌ Operação cancelada!" $RED
+        exit 1
+    fi
+    
+    print_message "🛑 Parando e removendo containers e volumes..." $YELLOW
+    docker-compose -f docker-compose.dev.yml down -v 2>/dev/null || true
+    
+    print_message "🗑️ Removendo imagens deste projeto..." $YELLOW
+    IMG_IDS=$(docker images -q momentum* 2>/dev/null)
+    if [ -n "$IMG_IDS" ]; then
+        docker rmi -f $IMG_IDS 2>/dev/null || true
+    fi
+    
+    print_message "✅ Ambiente Docker deste projeto completamente limpo!" $GREEN
 }
 
 # Função para mostrar status dos containers
 status() {
     print_message "📊 Status dos containers:" $BLUE
-    docker-compose ps
+    docker-compose -f docker-compose.dev.yml ps
 }
 
 # Função para mostrar ajuda
@@ -113,6 +135,7 @@ help() {
     echo "  logs [service] - Mostra logs de um serviço específico"
     echo "  exec [cmd] - Executa comando no container da aplicação"
     echo "  reset-db  - Reseta o banco de dados"
+    echo "  clean     - Remove TODOS containers, volumes e imagens (reverter)"
     echo "  status    - Mostra status dos containers"
     echo "  help      - Mostra esta ajuda"
     echo ""
@@ -142,6 +165,9 @@ case "${1:-help}" in
         ;;
     reset-db)
         reset_db
+        ;;
+    clean)
+        clean
         ;;
     status)
         status
