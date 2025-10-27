@@ -21,13 +21,15 @@ export class TasksService {
         description: 'Nenhum usuario encontrado com esse ID, insira outro',
       });
 
-    const task = this.prisma.task.create({
+    const task = await this.prisma.task.create({
       data: {
         ...createTask,
       },
     });
 
-    return task;
+    const { createdAt, updatedAt, deletedAt, ...dataTask } = task;
+
+    return dataTask as Task;
   }
 
   async updateTask(
@@ -84,6 +86,6 @@ export class TasksService {
       },
     });
 
-    return {message: 'Task deletado com sucesso.'};
+    return { message: 'Task deletado com sucesso.' };
   }
 }

@@ -1,9 +1,11 @@
+import { TaskPriority } from '@prisma/client';
 import {
   IsString,
   IsBoolean,
   IsOptional,
   IsInt,
   IsNotEmpty,
+  IsEnum,
   IsDate,
 } from 'class-validator';
 
@@ -12,15 +14,23 @@ export class CreateTaskDTO {
   @IsInt()
   userId: number;
 
+  @IsOptional()
+  @IsInt()
+  projectId?: number;
+
   @IsNotEmpty()
   @IsString()
   title: string;
 
   @IsOptional()
   @IsString()
-  description: string;
+  description?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
+  @IsEnum(TaskPriority)
+  priority?: TaskPriority;
+
+  @IsOptional()
   @IsBoolean()
   isCompleted: boolean;
 
@@ -30,9 +40,9 @@ export class CreateTaskDTO {
 
   @IsOptional()
   @IsInt()
-  estimatedDurationMin: number;
+  estimatedDurationMinutes?: number;
 
   @IsOptional()
   @IsInt()
-  estimatedSessions: number;
+  estimatedSessions?: number;
 }
