@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TasksModule } from './tasks/tasks.module';
@@ -17,7 +18,23 @@ import { NotificationModule } from './notification/notification.module';
 import { PlanModule } from './plan/plan.module';
 
 @Module({
-  imports: [TasksModule, PrismaModule, UserModule, AuthModule, RoleModule, UserRoleModule, DailyLogsModule, SettingsFocusModule, StudySessionsModule, LogsModule, ReportModule, ProjectModule, NotificationModule, PlanModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    TasksModule,
+    UserModule,
+    AuthModule,
+    RoleModule,
+    UserRoleModule,
+    DailyLogsModule,
+    SettingsFocusModule,
+    StudySessionsModule,
+    LogsModule,
+    ReportModule,
+    ProjectModule,
+    NotificationModule,
+    PlanModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

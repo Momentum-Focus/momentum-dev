@@ -4,6 +4,6 @@ import { SettingsFocusService } from './settings-focus.service';
 
 @Module({
   controllers: [SettingsFocusController],
-  providers: [SettingsFocusService]
+  providers: [SettingsFocusService],
 })
 export class SettingsFocusModule {}

@@ -4,6 +4,6 @@ import { StudySessionsService } from './study-sessions.service';
 
 @Module({
   controllers: [StudySessionsController],
-  providers: [StudySessionsService]
+  providers: [StudySessionsService],
 })
 export class StudySessionsModule {}
