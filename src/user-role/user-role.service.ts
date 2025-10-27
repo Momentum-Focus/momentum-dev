@@ -6,15 +6,11 @@ import {
 import { RegisterUserRoleDTO } from './dtos/registerUserRole.dto';
 import { UserRole } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { UserService } from 'src/user/user.service';
 import { UpdateUserRoleDTO } from './dtos/updateUserRole.dto';
 
 @Injectable()
 export class UserRoleService {
-  constructor(
-    private prisma: PrismaService,
-    private userService: UserService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   async create(
     registerUserRole: RegisterUserRoleDTO,
@@ -77,5 +73,14 @@ export class UserRoleService {
     });
 
     return { message: 'Usuário e cargo deletado com sucesso!' };
+  }
+
+  async deleteUserRolesByUserId(userId: number) {
+    await this.prisma.userRole.updateMany({
+      where: { userId },
+      data: { deletedAt: new Date() },
+    });
+
+    return { message: 'Roles do usuário deletadas com sucesso!' };
   }
 }

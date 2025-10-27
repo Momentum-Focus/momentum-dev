@@ -7,13 +7,13 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Role } from 'src/auth/roles/role.enum';
 import { Roles } from 'src/auth/roles/roles.decorator';
 import { RolesGuard } from 'src/auth/roles/roles.guard';
 import { RegisterUserRoleDTO } from './dtos/registerUserRole.dto';
 import { UserRoleService } from './user-role.service';
 import { UpdateUserRoleDTO } from './dtos/updateUserRole.dto';
+import { JwtAuthGuard } from 'src/auth/strategy/jwt-auth.guard';
 
 @Controller('user-role')
 export class UserRoleController {
