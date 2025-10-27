@@ -23,15 +23,11 @@ cd momentum-dev
 # No Linux/Mac
 ./docker-scripts.sh start
 
-# No Windows (PowerShell)
-bash docker-scripts.sh start
 ```
 
 ### 3. **Acesse a Aplicação**
 - **API**: http://localhost:3000
 - **Health Check**: http://localhost:3000/health
-- **PostgreSQL**: localhost:5432
-- **Redis**: localhost:6379
 
 ## 🛠️ Comandos Disponíveis
 
@@ -51,7 +47,6 @@ bash docker-scripts.sh start
 
 # Ver logs de um serviço específico
 ./docker-scripts.sh logs app
-./docker-scripts.sh logs postgres
 
 # Executar comandos no container
 ./docker-scripts.sh exec npx prisma studio
