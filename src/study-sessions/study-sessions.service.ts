@@ -10,10 +10,12 @@ export class StudySessionsService {
 
   async createStudySession(
     createStudySession: CreateStudySessionDTO,
+    userId: number,
   ): Promise<StudySession | null> {
     const studySession = await this.prisma.studySession.create({
       data: {
         ...createStudySession,
+        userId,
         startedAt: new Date(),
       },
     });

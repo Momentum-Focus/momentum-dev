@@ -28,10 +28,10 @@ export class StudySessionsController {
   ) {
     const userId = req.user!.id;
 
-    return this.studySessionsService.createStudySession({
-      ...createStudySession,
+    return this.studySessionsService.createStudySession(
+      createStudySession,
       userId,
-    });
+    );
   }
 
   @Patch(':id')

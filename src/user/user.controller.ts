@@ -29,9 +29,10 @@ export class UserController {
         cause: new Error(),
         description: 'Usuário não autenticado, faça login para continuar.',
       });
-    } 
+    }
 
-    const { password, createdAt, updatedAt, deletedAt, ...userProfileData } = userProfile;
+    const { password, createdAt, updatedAt, deletedAt, ...userProfileData } =
+      userProfile;
 
     return userProfileData;
   }

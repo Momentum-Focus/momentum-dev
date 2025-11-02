@@ -4,7 +4,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: builder
     container_name: momentum-app-dev
     restart: unless-stopped
     env_file:
