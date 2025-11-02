@@ -1,11 +1,5 @@
 import { SessionType } from '@prisma/client';
-import {
-  IsOptional,
-  IsInt,
-  IsNotEmpty,
-  IsDate,
-  IsEnum,
-} from 'class-validator';
+import { IsOptional, IsInt, IsNotEmpty, IsEnum } from 'class-validator';
 
 export class CreateStudySessionDTO {
   @IsNotEmpty()
@@ -15,14 +9,6 @@ export class CreateStudySessionDTO {
   @IsOptional()
   @IsInt()
   taskId?: number;
-
-  @IsNotEmpty()
-  @IsDate()
-  startedAt: Date;
-
-  @IsOptional()
-  @IsDate()
-  endedAt?: Date;
 
   @IsOptional()
   @IsInt()
