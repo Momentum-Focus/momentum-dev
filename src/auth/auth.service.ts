@@ -121,11 +121,19 @@ export class AuthService {
         throw error;
       }
 
-      // Erro do Prisma ou outro erro não tratado
+      // Erro do Prisma
       if (error.code === 'P2002') {
         const field = error.meta?.target?.[0] || 'campo';
         throw new BadRequestException(
           `Este ${field} já está em uso. Tente outro ${field}.`,
+        );
+      }
+
+      // Erro de timeout de transação
+      if (error.message?.includes('Transaction already closed') || error.message?.includes('timeout')) {
+        this.logger.error('Timeout na transação do Prisma');
+        throw new InternalServerErrorException(
+          'A operação demorou mais que o esperado. O usuário foi criado, mas ocorreu um erro ao finalizar. Tente fazer login.',
         );
       }
 
