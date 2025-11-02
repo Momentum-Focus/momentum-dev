@@ -18,12 +18,15 @@ async function bootstrap() {
         console.log('✅ CORS: Requisição sem origin permitida');
         return callback(null, true);
       }
-      
+
       // Normalizar origin (remover trailing slash se houver)
       const normalizedOrigin = origin.replace(/\/$/, '');
-      
+
       // Verificar se a origin está permitida
-      if (allowedOrigins.includes(normalizedOrigin) || allowedOrigins.includes(origin)) {
+      if (
+        allowedOrigins.includes(normalizedOrigin) ||
+        allowedOrigins.includes(origin)
+      ) {
         console.log(`✅ CORS: Origin permitida: ${origin}`);
         callback(null, true);
       } else {
