@@ -9,23 +9,37 @@ async function bootstrap() {
     ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
     : ['http://localhost:8080', 'https://momentum-rouge.vercel.app'];
 
+  console.log('🔒 Origens permitidas pelo CORS:', allowedOrigins);
+
   app.enableCors({
     origin: (origin, callback) => {
-      // Permitir requisições sem origin
+      // Permitir requisições sem origin (algumas requisições internas)
       if (!origin) {
+        console.log('✅ CORS: Requisição sem origin permitida');
         return callback(null, true);
       }
+      
+      // Normalizar origin (remover trailing slash se houver)
+      const normalizedOrigin = origin.replace(/\/$/, '');
+      
       // Verificar se a origin está permitida
-      if (allowedOrigins.includes(origin)) {
+      if (allowedOrigins.includes(normalizedOrigin) || allowedOrigins.includes(origin)) {
+        console.log(`✅ CORS: Origin permitida: ${origin}`);
         callback(null, true);
       } else {
-        console.log(`CORS bloqueado para origin: ${origin}`);
+        console.log(`❌ CORS bloqueado para origin: ${origin}`);
+        console.log(`📋 Origens permitidas: ${allowedOrigins.join(', ')}`);
         callback(new Error('Not allowed by CORS'), false);
       }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'X-Requested-With',
+    ],
     exposedHeaders: ['Content-Length', 'Content-Type'],
     preflightContinue: false,
     optionsSuccessStatus: 204,
