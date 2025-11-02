@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   InternalServerErrorException,
@@ -39,20 +40,7 @@ export class AuthService {
   async register(registerUserDTO: RegisterUserDTO) {
     try {
       const newUser = await this.userService.create(registerUserDTO);
-
-      if (!newUser?.id) {
-        throw new InternalServerErrorException(
-          'Erro ao criar usuário: ID não foi retornado após criação.',
-        );
-      }
-
       const roleId = await this.roleService.findRole('USER');
-
-      if (!roleId) {
-        throw new InternalServerErrorException(
-          'Erro ao configurar permissões: Role USER não encontrada.',
-        );
-      }
 
       await this.userRoleService.create({
         userId: newUser.id,
@@ -65,12 +53,6 @@ export class AuthService {
       const payload = { sub: registerData.id, email: registerData.email };
       const token = await this.jwtService.signAsync(payload);
 
-      if (!token) {
-        throw new InternalServerErrorException(
-          'Erro ao gerar token de autenticação.',
-        );
-      }
-
       return {
         message: 'Usuario cadastrado com sucesso!',
         user: registerData,
@@ -79,6 +61,7 @@ export class AuthService {
     } catch (error) {
       if (
         error instanceof BadRequestException ||
+        error instanceof ConflictException ||
         error instanceof InternalServerErrorException
       ) {
         throw error;
