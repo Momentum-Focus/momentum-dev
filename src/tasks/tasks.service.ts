@@ -1,7 +1,7 @@
 import {
   Injectable,
   NotFoundException,
-  ForbiddenException,
+  // ForbiddenException, // TODO: Remover comentário quando ProjectModule estiver pronto
 } from '@nestjs/common';
 import { CreateTaskDTO } from './dtos/createTask.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -16,26 +16,27 @@ export class TasksService {
     createTaskDto: CreateTaskDTO,
     userId: number,
   ): Promise<Task | null> {
-    if (createTaskDto.projectId) {
-      const project = await this.prisma.project.findFirst({
-        where: {
-          id: createTaskDto.projectId,
-          userId: userId,
-          deletedAt: null,
-        },
-      });
+    // TODO: Implementar validação de projeto quando ProjectModule estiver pronto
+    // if (createTaskDto.projectId) {
+    //   const project = await this.prisma.project.findFirst({
+    //     where: {
+    //       id: createTaskDto.projectId,
+    //       userId: userId,
+    //       deletedAt: null,
+    //     },
+    //   });
 
-      if (!project) {
-        throw new ForbiddenException(
-          'Projeto não encontrado ou não pertence a este usuário.',
-        );
-      }
-    }
+    //   if (!project) {
+    //     throw new ForbiddenException(
+    //       'Projeto não encontrado ou não pertence a este usuário.',
+    //     );
+    //   }
+    // }
 
     const task = await this.prisma.task.create({
       data: {
         ...createTaskDto,
-        userId: userId, // Usa o userId vindo do token
+        userId: userId,
       },
     });
 
@@ -70,19 +71,17 @@ export class TasksService {
   async findTasks(userId: number): Promise<Task[] | []> {
     const tasks = await this.prisma.task.findMany({
       where: { userId, deletedAt: null },
-      include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-            color: true,
-          },
-        },
-      },
-      orderBy: [
-        { priority: 'desc' },
-        { createdAt: 'asc' },
-      ],
+      // TODO: Implementar include de projeto quando ProjectModule estiver pronto
+      // include: {
+      //   project: {
+      //     select: {
+      //       id: true,
+      //       name: true,
+      //       color: true,
+      //     },
+      //   },
+      // },
+      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
     });
 
     return tasks.map((task) => {
