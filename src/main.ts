@@ -5,9 +5,17 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Habilitar CORS
-  const allowedOrigins = process.env.CORS_ORIGIN
+  let allowedOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
     : ['http://localhost:8080', 'https://momentum-rouge.vercel.app'];
+
+  // Normalizar origens: adicionar https:// se não tiver protocolo
+  allowedOrigins = allowedOrigins.map((origin) => {
+    if (!origin.startsWith('http://') && !origin.startsWith('https://')) {
+      return `https://${origin}`;
+    }
+    return origin;
+  });
 
   console.log('🔒 Origens permitidas pelo CORS:', allowedOrigins);
 
