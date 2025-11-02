@@ -15,11 +15,11 @@ import { Role } from 'src/auth/roles/role.enum';
 import { JwtAuthGuard } from 'src/auth/strategy/jwt-auth.guard';
 import type { Request } from 'express';
 
+@UseGuards(JwtAuthGuard)
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @UseGuards(JwtAuthGuard)
   @Patch('me')
   update(@Req() req: any, @Body() updateUser: UpdateUserDTO) {
     const userId = req.user.id;
@@ -27,14 +27,13 @@ export class UserController {
     return this.userService.update(userId, updateUser);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
   @Get()
   listUsers() {
     return this.userService.listUsers();
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('me')
   detailProfile(@Req() req: any) {
     const userProfile = req.user;
@@ -51,7 +50,6 @@ export class UserController {
     return userProfileData;
   }
 
-  @UseGuards(JwtAuthGuard)
   @Delete('me')
   deleteMyAccount(@Req() req: any) {
     const userId = req.user.id;
