@@ -99,7 +99,9 @@ export class AuthService {
         );
       }
 
-      this.logger.log(`Registro concluído com sucesso para: ${registerData.email}`);
+      this.logger.log(
+        `Registro concluído com sucesso para: ${registerData.email}`,
+      );
 
       return {
         message: 'Usuario cadastrado com sucesso!',
@@ -107,9 +109,15 @@ export class AuthService {
         token,
       };
     } catch (error) {
-      this.logger.error(`Erro completo no registro de ${registerUserDTO.email}:`, error);
+      this.logger.error(
+        `Erro completo no registro de ${registerUserDTO.email}:`,
+        error,
+      );
 
-      if (error instanceof BadRequestException || error instanceof InternalServerErrorException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof InternalServerErrorException
+      ) {
         throw error;
       }
 

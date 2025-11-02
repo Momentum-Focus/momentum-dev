@@ -30,7 +30,7 @@ export class AuthController {
         `Erro ao registrar usuário ${registerUser.email}:`,
         error.stack,
       );
-      
+
       if (error instanceof HttpException) {
         throw error;
       }
