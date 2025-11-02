@@ -17,13 +17,10 @@ async function bootstrap() {
     return origin;
   });
 
-  console.log('🔒 Origens permitidas pelo CORS:', allowedOrigins);
-
   app.enableCors({
     origin: (origin, callback) => {
       // Permitir requisições sem origin (algumas requisições internas)
       if (!origin) {
-        console.log('✅ CORS: Requisição sem origin permitida');
         return callback(null, true);
       }
 
@@ -35,11 +32,8 @@ async function bootstrap() {
         allowedOrigins.includes(normalizedOrigin) ||
         allowedOrigins.includes(origin)
       ) {
-        console.log(`✅ CORS: Origin permitida: ${origin}`);
         callback(null, true);
       } else {
-        console.log(`❌ CORS bloqueado para origin: ${origin}`);
-        console.log(`📋 Origens permitidas: ${allowedOrigins.join(', ')}`);
         callback(new Error('Not allowed by CORS'), false);
       }
     },
