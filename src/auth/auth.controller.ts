@@ -22,8 +22,11 @@ export class AuthController {
   async register(@Body() registerUser: RegisterUserDTO) {
     try {
       this.logger.log(`Tentativa de registro para: ${registerUser.email}`);
+
       const result = await this.authService.register(registerUser);
+
       this.logger.log(`Registro bem-sucedido para: ${registerUser.email}`);
+
       return result;
     } catch (error) {
       this.logger.error(
