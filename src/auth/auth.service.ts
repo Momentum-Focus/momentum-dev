@@ -2,6 +2,8 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RegisterUserDTO } from 'src/user/dtos/registerUser.dto';
@@ -13,6 +15,8 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -36,44 +40,91 @@ export class AuthService {
   }
 
   async register(registerUserDTO: RegisterUserDTO) {
-    const registedUser = await this.prisma.$transaction(async () => {
-      const newUser = await this.userService.create(registerUserDTO);
+    try {
+      this.logger.log(`Iniciando registro para: ${registerUserDTO.email}`);
 
-      const role = await this.roleService.findRole('USER');
+      const registedUser = await this.prisma.$transaction(async () => {
+        try {
+          this.logger.log('Criando usuário na tabela User...');
+          const newUser = await this.userService.create(registerUserDTO);
 
-      if (!newUser?.id)
-        throw new BadRequestException(
-          'Não foi possivel encontrar o id do usuario.',
-          {
-            cause: new Error(),
-            description:
-              'Provavelmente o usuario não foi inserido na tabela User.',
-          },
+          if (!newUser?.id) {
+            this.logger.error('Usuário criado mas sem ID retornado');
+            throw new InternalServerErrorException(
+              'Erro ao criar usuário: ID não foi retornado após criação.',
+            );
+          }
+
+          this.logger.log(`Usuário criado com ID: ${newUser.id}`);
+
+          this.logger.log('Buscando role USER...');
+          const roleId = await this.roleService.findRole('USER');
+          this.logger.log(`Role USER encontrada com ID: ${roleId}`);
+
+          if (!roleId) {
+            this.logger.error('Role USER não encontrada no banco de dados');
+            throw new InternalServerErrorException(
+              'Erro ao configurar permissões: Role USER não encontrada. Contate o suporte.',
+            );
+          }
+
+          const userRole = {
+            userId: newUser.id,
+            roleId: roleId,
+          };
+
+          this.logger.log('Criando relação User-Role...');
+          await this.userRoleService.create(userRole);
+          this.logger.log('Relação User-Role criada com sucesso');
+
+          return newUser;
+        } catch (error) {
+          this.logger.error('Erro na transação de registro:', error.stack);
+          throw error;
+        }
+      });
+
+      this.logger.log('Processando dados do usuário para resposta...');
+      const { password, createdAt, updatedAt, deletedAt, ...registerData } =
+        registedUser;
+
+      this.logger.log('Gerando token JWT...');
+      const payload = { sub: registerData.id, email: registerData.email };
+      const token = await this.jwtService.signAsync(payload);
+
+      if (!token) {
+        this.logger.error('Token não foi gerado');
+        throw new InternalServerErrorException(
+          'Erro ao gerar token de autenticação. Tente fazer login manualmente.',
         );
+      }
 
-      const userRole = {
-        userId: newUser.id,
-        roleId: role,
+      this.logger.log(`Registro concluído com sucesso para: ${registerData.email}`);
+
+      return {
+        message: 'Usuario cadastrado com sucesso!',
+        user: registerData,
+        token,
       };
+    } catch (error) {
+      this.logger.error(`Erro completo no registro de ${registerUserDTO.email}:`, error);
 
-      await this.userRoleService.create(userRole);
+      if (error instanceof BadRequestException || error instanceof InternalServerErrorException) {
+        throw error;
+      }
 
-      return newUser;
-    });
+      // Erro do Prisma ou outro erro não tratado
+      if (error.code === 'P2002') {
+        const field = error.meta?.target?.[0] || 'campo';
+        throw new BadRequestException(
+          `Este ${field} já está em uso. Tente outro ${field}.`,
+        );
+      }
 
-    const { password, createdAt, updatedAt, deletedAt, ...registerData } =
-      registedUser;
-
-    // Gere um token para o usuário recém-criado
-    const payload = { sub: registerData.id, email: registerData.email };
-
-    const token = await this.jwtService.signAsync(payload);
-
-    return {
-      message: 'Usuario cadastrado com sucesso!',
-      user: registerData,
-      token,
-    };
+      throw new InternalServerErrorException(
+        `Erro interno ao processar registro: ${error.message}. Tente novamente ou contate o suporte.`,
+      );
+    }
   }
 
   async generateToken(user: any) {
