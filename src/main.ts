@@ -9,7 +9,7 @@ async function bootstrap() {
     ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
     : ['http://localhost:8080', 'https://momentum-rouge.vercel.app'];
 
-  // Normalizar origens: adicionar https:// se não tiver protocolo
+  // Normalizar origens: adicionar https:// apenas se não tiver protocolo
   allowedOrigins = allowedOrigins.map((origin) => {
     if (!origin.startsWith('http://') && !origin.startsWith('https://')) {
       return `https://${origin}`;
@@ -18,7 +18,7 @@ async function bootstrap() {
   });
 
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       // Permitir requisições sem origin (algumas requisições internas)
       if (!origin) {
         return callback(null, true);
@@ -28,10 +28,7 @@ async function bootstrap() {
       const normalizedOrigin = origin.replace(/\/$/, '');
 
       // Verificar se a origin está permitida
-      if (
-        allowedOrigins.includes(normalizedOrigin) ||
-        allowedOrigins.includes(origin)
-      ) {
+      if (allowedOrigins.includes(normalizedOrigin) || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'), false);
