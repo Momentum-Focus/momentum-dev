@@ -5,6 +5,7 @@ import {
   Get,
   Patch,
   Req,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { UserService } from './user.service';
@@ -21,31 +22,30 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get()
-  detailProfile(@Req() req: any) {
+  detailProfile(@Req() req: Request) {
     const userProfile = req.user;
+    if (!userProfile) {
+      throw new UnauthorizedException('Usuário não autenticado', {
+        cause: new Error(),
+        description: 'Usuário não autenticado, faça login para continuar.',
+      });
+    } 
 
-    const {
-      password,
-      createdAt,
-      updatedAt,
-      deletedAt,
-      roles,
-      ...userProfileData
-    } = userProfile;
+    const { password, createdAt, updatedAt, deletedAt, ...userProfileData } = userProfile;
 
     return userProfileData;
   }
 
   @Patch()
-  update(@Req() req: any, @Body() updateUser: UpdateUserDTO) {
-    const userId = req.user.id;
+  update(@Req() req: Request, @Body() updateUser: UpdateUserDTO) {
+    const userId = req.user!.id;
 
     return this.userService.update(userId, updateUser);
   }
 
   @Delete()
-  deleteMyAccount(@Req() req: any) {
-    const userId = req.user.id;
+  deleteMyAccount(@Req() req: Request) {
+    const userId = req.user!.id;
 
     return this.userService.deleteMyAccount(userId);
   }
