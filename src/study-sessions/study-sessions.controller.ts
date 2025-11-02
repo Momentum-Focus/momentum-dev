@@ -21,7 +21,7 @@ export class StudySessionsController {
   constructor(private readonly studySessionsService: StudySessionsService) {}
 
   @UseGuards(JwtAuthGuard)
-  @Post('me')
+  @Post()
   createStudySession(
     @Req() req: Request,
     @Body() createStudySession: CreateStudySessionDTO,
@@ -39,26 +39,43 @@ export class StudySessionsController {
   updateStudySession(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateStudySession: UpdateStudySessionDTO,
+    @Req() req: Request,
   ) {
-    return this.studySessionsService.updateStudySession(id, updateStudySession);
+    const userId = req.user!.id;
+
+    return this.studySessionsService.updateStudySession(
+      id,
+      updateStudySession,
+      userId,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('me')
-  listMyStudySessions(@Req() req: any) {
+  @Get()
+  listStudySessions(@Req() req: any) {
     const userId = req.user.id;
     return this.studySessionsService.findStudySessions(userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  findStudySessionById(@Param('id', ParseIntPipe) id: number) {
-    return this.studySessionsService.findStudySessionById(id);
+  findStudySessionById(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: Request,
+  ) {
+    const userId = req.user!.id;
+
+    return this.studySessionsService.findStudySessionById(id, userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  deleteStudySession(@Param('id', ParseIntPipe) id: number) {
-    return this.studySessionsService.deleteStudySession(id);
+  deleteStudySession(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: Request,
+  ) {
+    const userId = req.user!.id;
+
+    return this.studySessionsService.deleteStudySession(id, userId);
   }
 }

@@ -27,8 +27,9 @@ export class StudySessionsService {
   async updateStudySession(
     id: number,
     updateStudySession: UpdateStudySessionDTO,
+    userId: number,
   ): Promise<StudySession | null> {
-    await this.findStudySessionById(id);
+    await this.findStudySessionById(id, userId);
 
     const updatedStudySession = await this.prisma.studySession.update({
       where: { id },
@@ -54,9 +55,12 @@ export class StudySessionsService {
     });
   }
 
-  async findStudySessionById(id: number): Promise<StudySession | null> {
+  async findStudySessionById(
+    id: number,
+    userId: number,
+  ): Promise<StudySession | null> {
     const studySession = await this.prisma.studySession.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, userId, deletedAt: null },
     });
 
     if (!studySession)
@@ -72,8 +76,11 @@ export class StudySessionsService {
     return dataStudySession as StudySession;
   }
 
-  async deleteStudySession(id: number): Promise<{ message: string }> {
-    await this.findStudySessionById(id);
+  async deleteStudySession(
+    id: number,
+    userId: number,
+  ): Promise<{ message: string }> {
+    await this.findStudySessionById(id, userId);
 
     await this.prisma.studySession.update({
       where: { id },
