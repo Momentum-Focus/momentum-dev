@@ -6,7 +6,6 @@ import {
   Request,
   HttpException,
   HttpStatus,
-  Logger,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RegisterUserDTO } from 'src/user/dtos/registerUser.dto';
@@ -14,26 +13,13 @@ import { AuthService } from './auth.service';
 
 @Controller('auth')
 export class AuthController {
-  private readonly logger = new Logger(AuthController.name);
-
   constructor(private readonly authService: AuthService) {}
 
   @Post('/register')
   async register(@Body() registerUser: RegisterUserDTO) {
     try {
-      this.logger.log(`Tentativa de registro para: ${registerUser.email}`);
-
-      const result = await this.authService.register(registerUser);
-
-      this.logger.log(`Registro bem-sucedido para: ${registerUser.email}`);
-
-      return result;
+      return await this.authService.register(registerUser);
     } catch (error) {
-      this.logger.error(
-        `Erro ao registrar usuário ${registerUser.email}:`,
-        error.stack,
-      );
-
       if (error instanceof HttpException) {
         throw error;
       }
