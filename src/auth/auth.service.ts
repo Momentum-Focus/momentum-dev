@@ -40,6 +40,15 @@ export class AuthService {
   async register(registerUserDTO: RegisterUserDTO) {
     try {
       const newUser = await this.userService.create(registerUserDTO);
+
+      if (!newUser) {
+        throw new InternalServerErrorException('Erro ao criar usuário.', {
+          cause: new Error(),
+          description:
+            'Erro ao inserir o usuário no banco de dados, verifique a conexão com o banco.',
+        });
+      }
+
       const roleId = await this.roleService.findRole('USER');
 
       await this.userRoleService.create({
