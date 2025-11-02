@@ -3,26 +3,14 @@ import { CreateStudySessionDTO } from './dtos/createStudySessions.dto';
 import { UpdateStudySessionDTO } from './dtos/updateStudySessions.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { StudySession } from '@prisma/client';
-import { UserService } from 'src/user/user.service';
 
 @Injectable()
 export class StudySessionsService {
-  constructor(
-    private prisma: PrismaService,
-    private userService: UserService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   async createStudySession(
     createStudySession: CreateStudySessionDTO,
   ): Promise<StudySession | null> {
-    const user = await this.userService.findUserByID(createStudySession.userId);
-
-    if (!user)
-      throw new NotFoundException('ID inválido!', {
-        cause: new Error(),
-        description: 'Nenhum usuario encontrado com esse ID, insira outro',
-      });
-
     const studySession = await this.prisma.studySession.create({
       data: {
         ...createStudySession,
