@@ -1,83 +1,113 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { CreateTaskDTO } from './dtos/createTask.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Task } from '@prisma/client';
-import { UserService } from 'src/user/user.service';
+import { Task, Prisma } from '@prisma/client';
 import { UpdateTaskDTO } from './dtos/updateTask.dto';
 
 @Injectable()
 export class TasksService {
-  constructor(
-    private prisma: PrismaService,
-    private userService: UserService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
-  async createTask(createTask: CreateTaskDTO): Promise<Task | null> {
-    const user = await this.userService.findUserByID(createTask.userId);
-
-    if (!user)
-      throw new NotFoundException('ID inválido!', {
-        cause: new Error(),
-        description: 'Nenhum usuario encontrado com esse ID, insira outro',
+  async createTask(
+    createTaskDto: CreateTaskDTO,
+    userId: number,
+  ): Promise<Task | null> {
+    if (createTaskDto.projectId) {
+      const project = await this.prisma.project.findFirst({
+        where: {
+          id: createTaskDto.projectId,
+          userId: userId,
+          deletedAt: null,
+        },
       });
+
+      if (!project) {
+        throw new ForbiddenException(
+          'Projeto não encontrado ou não pertence a este usuário.',
+        );
+      }
+    }
 
     const task = await this.prisma.task.create({
       data: {
-        ...createTask,
+        ...createTaskDto,
+        userId: userId, // Usa o userId vindo do token
       },
     });
 
     const { createdAt, updatedAt, deletedAt, ...dataTask } = task;
-
     return dataTask as Task;
   }
 
   async updateTask(
     id: number,
     updateTask: UpdateTaskDTO,
+    userId: number,
   ): Promise<Task | null> {
-    await this.findTaskById(id);
+    await this.findTaskById(id, userId);
+
+    const data: Prisma.TaskUpdateInput = { ...updateTask };
+
+    if (updateTask.isCompleted === true) {
+      data.completedAt = new Date();
+    } else if (updateTask.isCompleted === false) {
+      data.completedAt = null;
+    }
 
     const updatedTask = await this.prisma.task.update({
       where: { id },
-      data: { ...updateTask },
+      data: data,
     });
 
     const { createdAt, updatedAt, deletedAt, ...dataTask } = updatedTask;
-
     return dataTask as Task;
   }
 
   async findTasks(userId: number): Promise<Task[] | []> {
     const tasks = await this.prisma.task.findMany({
       where: { userId, deletedAt: null },
+      include: {
+        project: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
+      },
+      orderBy: [
+        { priority: 'desc' },
+        { createdAt: 'asc' },
+      ],
     });
 
     return tasks.map((task) => {
       const { createdAt, updatedAt, deletedAt, ...dataTask } = task;
-
       return dataTask as Task;
     });
   }
 
-  async findTaskById(id: number): Promise<Task | null> {
+  async findTaskById(id: number, userId: number): Promise<Task | null> {
     const task = await this.prisma.task.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, userId: userId, deletedAt: null },
     });
 
-    if (!task)
-      throw new NotFoundException('ID Inválido!', {
-        cause: new Error(),
-        description: 'Task não encontrada, atualize o id e tente novamente.',
-      });
+    if (!task) {
+      throw new NotFoundException(
+        'Tarefa não encontrada ou você não tem permissão para acessá-la.',
+      );
+    }
 
     const { createdAt, updatedAt, deletedAt, ...dataTask } = task;
-
     return dataTask as Task;
   }
 
-  async deleteTask(id: number): Promise<{ message: string }> {
-    await this.findTaskById(id);
+  async deleteTask(id: number, userId: number): Promise<{ message: string }> {
+    await this.findTaskById(id, userId);
 
     await this.prisma.task.update({
       where: { id },
@@ -86,6 +116,6 @@ export class TasksService {
       },
     });
 
-    return { message: 'Task deletado com sucesso.' };
+    return { message: 'Tarefa deletada com sucesso.' };
   }
 }

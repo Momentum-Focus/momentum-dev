@@ -16,43 +16,42 @@ import { TasksService } from './tasks.service';
 import { JwtAuthGuard } from 'src/auth/strategy/jwt-auth.guard';
 import type { Request } from 'express';
 
+@UseGuards(JwtAuthGuard)
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
-  @UseGuards(JwtAuthGuard)
-  @Post('me')
+  @Post()
   createTask(@Req() req: Request, @Body() createTask: CreateTaskDTO) {
     const userId = req.user!.id;
-
-    return this.tasksService.createTask({ ...createTask, userId });
+    return this.tasksService.createTask(createTask, userId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   updateTask(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateTask: UpdateTaskDTO,
+    @Req() req: Request,
   ) {
-    return this.tasksService.updateTask(id, updateTask);
+    const userId = req.user!.id;
+    return this.tasksService.updateTask(id, updateTask, userId);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Get('me')
+  @Get()
   listMyTasks(@Req() req: any) {
     const userId = req.user.id;
     return this.tasksService.findTasks(userId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get(':id')
-  findTaskById(@Param('id', ParseIntPipe) id: number) {
-    return this.tasksService.findTaskById(id);
+  findTaskById(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+    const userId = req.user!.id;
+    return this.tasksService.findTaskById(id, userId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  deleteTask(@Param('id', ParseIntPipe) id: number) {
-    return this.tasksService.deleteTask(id);
+  deleteTask(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+    const userId = req.user!.id;
+    return this.tasksService.deleteTask(id, userId);
   }
 }
