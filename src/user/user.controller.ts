@@ -20,21 +20,7 @@ import type { Request } from 'express';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Patch('me')
-  update(@Req() req: any, @Body() updateUser: UpdateUserDTO) {
-    const userId = req.user.id;
-
-    return this.userService.update(userId, updateUser);
-  }
-
-  @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
   @Get()
-  listUsers() {
-    return this.userService.listUsers();
-  }
-
-  @Get('me')
   detailProfile(@Req() req: any) {
     const userProfile = req.user;
 
@@ -50,10 +36,24 @@ export class UserController {
     return userProfileData;
   }
 
-  @Delete('me')
+  @Patch()
+  update(@Req() req: any, @Body() updateUser: UpdateUserDTO) {
+    const userId = req.user.id;
+
+    return this.userService.update(userId, updateUser);
+  }
+
+  @Delete()
   deleteMyAccount(@Req() req: any) {
     const userId = req.user.id;
 
     return this.userService.deleteMyAccount(userId);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @Get('all')
+  listUsers() {
+    return this.userService.listUsers();
   }
 }
