@@ -15,8 +15,6 @@ export class AuthController {
   @UseGuards(AuthGuard('local'))
   @Post('/login')
   login(@Request() req: any) {
-    // req.user foi validado pelo LocalStrategy
-    // Agora só precisamos gerar o token
     return this.authService.generateToken(req.user);
   }
 }

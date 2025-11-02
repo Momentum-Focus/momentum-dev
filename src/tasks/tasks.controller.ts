@@ -24,6 +24,7 @@ export class TasksController {
   @Post()
   createTask(@Req() req: Request, @Body() createTask: CreateTaskDTO) {
     const userId = req.user!.id;
+
     return this.tasksService.createTask(createTask, userId);
   }
 
@@ -34,24 +35,28 @@ export class TasksController {
     @Req() req: Request,
   ) {
     const userId = req.user!.id;
+
     return this.tasksService.updateTask(id, updateTask, userId);
   }
 
   @Get()
   listMyTasks(@Req() req: any) {
     const userId = req.user.id;
+
     return this.tasksService.findTasks(userId);
   }
 
   @Get(':id')
   findTaskById(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
     const userId = req.user!.id;
+
     return this.tasksService.findTaskById(id, userId);
   }
 
   @Delete(':id')
   deleteTask(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
     const userId = req.user!.id;
+    
     return this.tasksService.deleteTask(id, userId);
   }
 }

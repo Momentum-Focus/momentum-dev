@@ -16,11 +16,11 @@ import { StudySessionsService } from './study-sessions.service';
 import { JwtAuthGuard } from 'src/auth/strategy/jwt-auth.guard';
 import type { Request } from 'express';
 
+@UseGuards(JwtAuthGuard)
 @Controller('study-sessions')
 export class StudySessionsController {
   constructor(private readonly studySessionsService: StudySessionsService) {}
 
-  @UseGuards(JwtAuthGuard)
   @Post()
   createStudySession(
     @Req() req: Request,
@@ -34,7 +34,6 @@ export class StudySessionsController {
     });
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   updateStudySession(
     @Param('id', ParseIntPipe) id: number,
@@ -50,14 +49,12 @@ export class StudySessionsController {
     );
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get()
   listStudySessions(@Req() req: any) {
     const userId = req.user.id;
     return this.studySessionsService.findStudySessions(userId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get(':id')
   findStudySessionById(
     @Param('id', ParseIntPipe) id: number,
@@ -68,7 +65,6 @@ export class StudySessionsController {
     return this.studySessionsService.findStudySessionById(id, userId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   deleteStudySession(
     @Param('id', ParseIntPipe) id: number,
