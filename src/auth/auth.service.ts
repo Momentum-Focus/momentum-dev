@@ -43,46 +43,52 @@ export class AuthService {
     try {
       this.logger.log(`Iniciando registro para: ${registerUserDTO.email}`);
 
-      const registedUser = await this.prisma.$transaction(async () => {
-        try {
-          this.logger.log('Criando usuário na tabela User...');
-          const newUser = await this.userService.create(registerUserDTO);
+      const registedUser = await this.prisma.$transaction(
+        async () => {
+          try {
+            this.logger.log('Criando usuário na tabela User...');
+            const newUser = await this.userService.create(registerUserDTO);
 
-          if (!newUser?.id) {
-            this.logger.error('Usuário criado mas sem ID retornado');
-            throw new InternalServerErrorException(
-              'Erro ao criar usuário: ID não foi retornado após criação.',
-            );
+            if (!newUser?.id) {
+              this.logger.error('Usuário criado mas sem ID retornado');
+              throw new InternalServerErrorException(
+                'Erro ao criar usuário: ID não foi retornado após criação.',
+              );
+            }
+
+            this.logger.log(`Usuário criado com ID: ${newUser.id}`);
+
+            this.logger.log('Buscando role USER...');
+            const roleId = await this.roleService.findRole('USER');
+            this.logger.log(`Role USER encontrada com ID: ${roleId}`);
+
+            if (!roleId) {
+              this.logger.error('Role USER não encontrada no banco de dados');
+              throw new InternalServerErrorException(
+                'Erro ao configurar permissões: Role USER não encontrada. Contate o suporte.',
+              );
+            }
+
+            const userRole = {
+              userId: newUser.id,
+              roleId: roleId,
+            };
+
+            this.logger.log('Criando relação User-Role...');
+            await this.userRoleService.create(userRole);
+            this.logger.log('Relação User-Role criada com sucesso');
+
+            return newUser;
+          } catch (error) {
+            this.logger.error('Erro na transação de registro:', error.stack);
+            throw error;
           }
-
-          this.logger.log(`Usuário criado com ID: ${newUser.id}`);
-
-          this.logger.log('Buscando role USER...');
-          const roleId = await this.roleService.findRole('USER');
-          this.logger.log(`Role USER encontrada com ID: ${roleId}`);
-
-          if (!roleId) {
-            this.logger.error('Role USER não encontrada no banco de dados');
-            throw new InternalServerErrorException(
-              'Erro ao configurar permissões: Role USER não encontrada. Contate o suporte.',
-            );
-          }
-
-          const userRole = {
-            userId: newUser.id,
-            roleId: roleId,
-          };
-
-          this.logger.log('Criando relação User-Role...');
-          await this.userRoleService.create(userRole);
-          this.logger.log('Relação User-Role criada com sucesso');
-
-          return newUser;
-        } catch (error) {
-          this.logger.error('Erro na transação de registro:', error.stack);
-          throw error;
-        }
-      });
+        },
+        {
+          maxWait: 10000, // Tempo máximo de espera: 10 segundos
+          timeout: 20000, // Timeout da transação: 20 segundos
+        },
+      );
 
       this.logger.log('Processando dados do usuário para resposta...');
       const { password, createdAt, updatedAt, deletedAt, ...registerData } =
@@ -130,7 +136,10 @@ export class AuthService {
       }
 
       // Erro de timeout de transação
-      if (error.message?.includes('Transaction already closed') || error.message?.includes('timeout')) {
+      if (
+        error.message?.includes('Transaction already closed') ||
+        error.message?.includes('timeout')
+      ) {
         this.logger.error('Timeout na transação do Prisma');
         throw new InternalServerErrorException(
           'A operação demorou mais que o esperado. O usuário foi criado, mas ocorreu um erro ao finalizar. Tente fazer login.',
