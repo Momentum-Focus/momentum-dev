@@ -7,7 +7,7 @@ async function bootstrap() {
   // Habilitar CORS
   const allowedOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',')
-    : ['http://localhost:8080'];
+    : ['http://localhost:8080', 'https://momentum-rouge.vercel.app'];
 
   app.enableCors({
     origin: (
