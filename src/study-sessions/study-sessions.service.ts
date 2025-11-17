@@ -14,9 +14,11 @@ export class StudySessionsService {
   ): Promise<StudySession | null> {
     const studySession = await this.prisma.studySession.create({
       data: {
-        ...createStudySession,
         userId,
         startedAt: new Date(),
+        taskId: createStudySession.taskId,
+        durationMinutes: createStudySession.durationMinutes,
+        typeSession: createStudySession.typeSession,
       },
     });
 

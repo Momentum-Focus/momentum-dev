@@ -1,16 +1,21 @@
 import {
   Injectable,
   NotFoundException,
-  // ForbiddenException, // TODO: Remover comentário quando ProjectModule estiver pronto
 } from '@nestjs/common';
 import { CreateTaskDTO } from './dtos/createTask.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Task, Prisma } from '@prisma/client';
+import { Task, Prisma, LogActionType } from '@prisma/client';
 import { UpdateTaskDTO } from './dtos/updateTask.dto';
+import { LogsService } from 'src/logs/logs.service';
+import { AchievementsService } from 'src/achievements/achievements.service';
 
 @Injectable()
 export class TasksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private logsService: LogsService,
+    private achievementsService: AchievementsService,
+  ) {}
 
   async createTask(
     createTaskDto: CreateTaskDTO,
@@ -40,6 +45,12 @@ export class TasksService {
       },
     });
 
+    await this.logsService.createLog(
+      userId,
+      LogActionType.TASK_CREATE,
+      `Task created: ${task.title}`,
+    );
+
     const { createdAt, updatedAt, deletedAt, ...dataTask } = task;
     return dataTask as Task;
   }
@@ -63,6 +74,23 @@ export class TasksService {
       where: { id },
       data: data,
     });
+
+    if (updateTask.isCompleted === true) {
+      await this.logsService.createLog(
+        userId,
+        LogActionType.TASK_COMPLETE,
+        `Task completed: ${updatedTask.title}`,
+      );
+      await this.achievementsService.checkAndGrantAchievements(userId);
+    }
+
+    if (updateTask.isCompleted !== true) {
+      await this.logsService.createLog(
+        userId,
+        LogActionType.TASK_UPDATE,
+        `Task updated: ${updatedTask.title}`,
+      );
+    }
 
     const { createdAt, updatedAt, deletedAt, ...dataTask } = updatedTask;
     return dataTask as Task;
@@ -106,7 +134,11 @@ export class TasksService {
   }
 
   async deleteTask(id: number, userId: number): Promise<{ message: string }> {
-    await this.findTaskById(id, userId);
+    const task = await this.findTaskById(id, userId);
+
+    if (!task) {
+      throw new NotFoundException('Tarefa não encontrada');
+    }
 
     await this.prisma.task.update({
       where: { id },
@@ -114,6 +146,12 @@ export class TasksService {
         deletedAt: new Date(),
       },
     });
+
+    await this.logsService.createLog(
+      userId,
+      LogActionType.TASK_DELETE,
+      `Task deleted: ${task.title}`,
+    );
 
     return { message: 'Tarefa deletada com sucesso.' };
   }

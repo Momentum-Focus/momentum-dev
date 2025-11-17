@@ -16,6 +16,10 @@ import { ReportModule } from './report/report.module';
 import { ProjectModule } from './project/project.module';
 import { NotificationModule } from './notification/notification.module';
 import { PlanModule } from './plan/plan.module';
+import { MediaModule } from './media/media.module';
+import { TagsModule } from './tags/tags.module';
+import { CommentsModule } from './comments/comments.module';
+import { AchievementsModule } from './achievements/achievements.module';
 
 @Module({
   imports: [
@@ -34,6 +38,10 @@ import { PlanModule } from './plan/plan.module';
     ProjectModule,
     NotificationModule,
     PlanModule,
+    MediaModule,
+    TagsModule,
+    CommentsModule,
+    AchievementsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
