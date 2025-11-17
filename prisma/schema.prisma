@@ -1,50 +1,255 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
   output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 model Role {
-  id                      Int                   @id @default(autoincrement())                 // Identificador único da role
-  name                    String                @unique                                       // Nome da role (ex: ADMIN, USER)
-  user                    UserRole[]
-
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  deletedAt               DateTime?
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  deletedAt DateTime?
+  user      UserRole[]
 }
 
 model User {
-  id                      Int                   @id @default(autoincrement())                 // Identificador único do usuário
-  name                    String                                                              // Nome do usuário
-  email                   String                @unique                                       // Email de login, deve ser único
-  phone                   String                @unique                                       // Telefone do usuário, deve ser único
-  password                String                                                              // Senha criptografada do usuário
-  emailVerified           Boolean               @default(false)                               // Flag para verificar se o email foi confirmado
+  id                  Int               @id @default(autoincrement())
+  name                String
+  email               String            @unique
+  phone               String?           @unique
+  cpf                 String?           @unique
+  password            String?
+  emailVerified       Boolean           @default(false)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  deletedAt           DateTime?
+  isSpotifyConnected  Boolean           @default(false)
+  spotifyAccessToken  String?
+  spotifyRefreshToken String?
+  authMethod          AuthMethod        @default(EMAIL)
+  googleAccessToken   String?
+  googleId            String?           @unique
+  googleRefreshToken  String?
+  isGoogleConnected   Boolean           @default(false)
+  dailyLogs           DailyLog[]
+  logs                LogActivity[]
+  media               Media[]
+  notifications       Notification[]
+  projects            Project[]
+  reports             Report[]
+  settings            SettingsFocus?
+  studySessions       StudySession[]
+  subscriptions       Subscription?
+  tasks               Task[]
+  roles               UserRole[]
+  tags                Tag[]
+  comments            Comment[]
+  achievements        UserAchievement[]
+}
 
-  roles                   UserRole[]
-  notifications           Notification[]
-  tasks                   Task[]
-  settings                SettingsFocus?
-  dailyLogs               DailyLog[]
-  logs                    LogActivity[]
-  reports                 Report[]
-  media                   Media[]
-  studySessions           StudySession[]
-  projects                Project[]
-  subscriptions           Subscription?
+model Media {
+  id        Int       @id @default(autoincrement())
+  type      MediaType
+  url       String
+  isActive  Boolean   @default(false)
+  userId    Int
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  user      User      @relation(fields: [userId], references: [id])
+}
 
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  deletedAt               DateTime?
+model SettingsFocus {
+  id                        Int       @id @default(autoincrement())
+  userId                    Int       @unique
+  focusDurationMinutes      Int       @default(25)
+  shortBreakDurationMinutes Int       @default(5)
+  longBreakDurationMinutes  Int       @default(15)
+  cyclesBeforeLongBreak     Int       @default(4)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  deletedAt                 DateTime?
+  user                      User      @relation(fields: [userId], references: [id])
+}
+
+model UserRole {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  roleId    Int
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  role      Role      @relation(fields: [roleId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, roleId])
+}
+
+model Notification {
+  id        Int                @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String
+  status    NotificationStatus @default(UNREAD)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  deletedAt DateTime?
+  user      User               @relation(fields: [userId], references: [id])
+}
+
+model Task {
+  id                       Int            @id @default(autoincrement())
+  userId                   Int
+  title                    String
+  description              String?
+  priority                 TaskPriority   @default(MEDIUM)
+  isCompleted              Boolean        @default(false)
+  completedAt              DateTime?
+  estimatedDurationMinutes Int?
+  estimatedSessions        Int?
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+  deletedAt                DateTime?
+  projectId                Int?
+  studySessions            StudySession[]
+  project                  Project?       @relation(fields: [projectId], references: [id])
+  user                     User           @relation(fields: [userId], references: [id])
+  tags                     TagTask[]
+  comments                 Comment[]
+}
+
+model Project {
+  id          Int           @id @default(autoincrement())
+  name        String
+  description String?
+  status      ProjectStatus @default(NOT_STARTED)
+  dueDate     DateTime?
+  completedAt DateTime?
+  color       String?
+  userId      Int
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+  user        User          @relation(fields: [userId], references: [id])
+  tasks       Task[]
+  comments    Comment[]
+}
+
+model StudySession {
+  id              Int         @id @default(autoincrement())
+  userId          Int
+  taskId          Int?
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationMinutes Int?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  deletedAt       DateTime?
+  typeSession     SessionType
+  task            Task?       @relation(fields: [taskId], references: [id])
+  user            User        @relation(fields: [userId], references: [id])
+}
+
+model DailyLog {
+  id                Int       @id @default(autoincrement())
+  userId            Int
+  date              DateTime  @db.Date
+  totalFocusMinutes Int       @default(0)
+  tasksCompleted    Int       @default(0)
+  completedSessions Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+  user              User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+}
+
+model Plan {
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  description   String?
+  price         Decimal?
+  billingCycle  BillingCycle?
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+  features      PlanFeature[]
+  subscriptions Subscription[]
+}
+
+model Feature {
+  id          Int           @id @default(autoincrement())
+  code        String        @unique
+  name        String
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+  plans       PlanFeature[]
+}
+
+model PlanFeature {
+  id        Int      @id @default(autoincrement())
+  planId    Int
+  featureId Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  feature   Feature  @relation(fields: [featureId], references: [id])
+  plan      Plan     @relation(fields: [planId], references: [id])
+
+  @@unique([planId, featureId])
+}
+
+model Subscription {
+  id           Int                @id @default(autoincrement())
+  status       SubscriptionStatus
+  startDate    DateTime
+  endDate      DateTime?
+  trialEndDate DateTime?
+  userId       Int                @unique
+  planId       Int
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  deletedAt    DateTime?
+  plan         Plan               @relation(fields: [planId], references: [id])
+  user         User               @relation(fields: [userId], references: [id])
+}
+
+model LogActivity {
+  id        Int           @id @default(autoincrement())
+  userId    Int?
+  action    LogActionType
+  details   String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  deletedAt DateTime?
+  user      User?         @relation(fields: [userId], references: [id])
+}
+
+model Report {
+  id          Int          @id @default(autoincrement())
+  userId      Int
+  title       String
+  description String
+  type        ReportType
+  status      ReportStatus @default(OPEN)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+  user        User         @relation(fields: [userId], references: [id])
+}
+
+enum AuthMethod {
+  EMAIL
+  GOOGLE
 }
 
 enum MediaType {
@@ -52,64 +257,9 @@ enum MediaType {
   VIDEO
 }
 
-model Media {
-  id                      Int                   @id @default(autoincrement())                 // Identificador único da mídia
-  type                    MediaType                                                           // Tipo da mídia (IMAGEM ou VIDEO)
-  url                     String                                                              // URL onde o arquivo está armazenado
-  isActive                Boolean               @default(false)                               // Flag que indica se é o fundo ativo do usuário
-
-  userId                  Int
-  user                    User                  @relation(fields: [userId], references: [id])
-
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  deletedAt               DateTime?
-}
-
-model SettingsFocus {
-  id                        Int                   @id @default(autoincrement())                 // Identificador único das configurações
-  userId                    Int                   @unique
-  user                      User                  @relation(fields: [userId], references: [id])
-  focusDurationMinutes      Int                   @default(25)                                  // Duração do ciclo de foco em minutos
-  shortBreakDurationMinutes Int                   @default(5)                                   // Duração da pausa curta em minutos
-  longBreakDurationMinutes  Int                   @default(15)                                  // Duração da pausa longa em minutos
-  cyclesBeforeLongBreak     Int                   @default(4)                                   // Número de ciclos de foco antes de uma pausa longa
-
-  createdAt                 DateTime              @default(now())
-  updatedAt                 DateTime              @updatedAt
-  deletedAt                 DateTime?
-}
-
-model UserRole {
-  id                      Int                   @id @default(autoincrement())                 // Identificador único da relação usuário-role
-  userId                  Int
-  user                    User                  @relation(fields: [userId], references: [id])
-  roleId                  Int
-  role                    Role                  @relation(fields: [roleId], references: [id])
-
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  deletedAt               DateTime?
-
-  @@unique([userId, roleId])
-}
-
 enum NotificationStatus {
   UNREAD
   READ
-}
-
-model Notification {
-  id                      Int                   @id @default(autoincrement())                 // Identificador único da notificação
-  userId                  Int
-  user                    User                  @relation(fields: [userId], references: [id])
-  title                   String                                                              // Título da notificação
-  message                 String                                                              // Conteúdo da notificação
-  status                  NotificationStatus    @default(UNREAD)                              // Status da notificação (lida ou não lida)
-
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  deletedAt               DateTime?
 }
 
 enum TaskPriority {
@@ -119,49 +269,10 @@ enum TaskPriority {
   URGENT
 }
 
-model Task {
-  id                       Int                  @id @default(autoincrement())                 // Identificador único da tarefa
-  userId                   Int
-  user                     User                 @relation(fields: [userId], references: [id])
-  projectId                Int?
-  project                  Project?             @relation(fields: [projectId], references: [id])
-  title                    String                                                             // Título da tarefa
-  description              String?                                                            // Descrição detalhada da tarefa
-  priority                 TaskPriority         @default(MEDIUM)                              // Prioridade da tarefa
-  isCompleted              Boolean              @default(false)                               // Flag que indica se a tarefa foi concluída
-  completedAt              DateTime?                                                          // Data e hora em que a tarefa foi marcada como concluída
-  estimatedDurationMinutes Int?                                                             // Estimativa de tempo total para a tarefa em minutos
-  estimatedSessions        Int?                                                             // Estimativa de quantos ciclos de foco a tarefa levará
-
-  studySessions            StudySession[]
-
-  createdAt                DateTime             @default(now())
-  updatedAt                DateTime             @updatedAt
-  deletedAt                DateTime?
-}
-
 enum ProjectStatus {
   NOT_STARTED
   IN_PROGRESS
   COMPLETED
-}
-
-model Project {
-  id          Int            @id @default(autoincrement()) // Identificador único do projeto
-  name        String                                         // Nome do projeto (ex: "TCC - Capítulo 1")
-  description String?                                        // Descrição opcional detalhada do projeto
-  status      ProjectStatus  @default(NOT_STARTED)           // Status atual do projeto (usando o Enum)
-  dueDate     DateTime?                                      // Data limite opcional para conclusão do projeto
-  completedAt DateTime?                                      // Data em que o projeto foi marcado como concluído
-  color       String?                                        // Cor associada ao projeto (ex: #FF5733) para UI
-
-  userId      Int
-  user        User           @relation(fields: [userId], references: [id])
-  tasks       Task[]                                         // Lista de tarefas associadas a este projeto
-
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  deletedAt   DateTime?                                      // Para soft delete
 }
 
 enum SessionType {
@@ -170,143 +281,45 @@ enum SessionType {
   LONG_BREAK
 }
 
-model StudySession {
-  id                      Int                   @id @default(autoincrement())                 // Identificador único da sessão de estudo
-  userId                  Int
-  user                    User                  @relation(fields: [userId], references: [id])
-  taskId                  Int?
-  task                    Task?                 @relation(fields: [taskId], references: [id])
-  startedAt               DateTime                                                            // Data e hora em que a sessão começou
-  endedAt                 DateTime?                                                           // Data e hora em que a sessão terminou
-  durationMinutes         Int?                                                              // Duração real da sessão em minutos
-  typeSession             SessionType                                                         // Tipo da sessão (foco, pausa curta ou longa)
-
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  deletedAt               DateTime?
-}
-
-model DailyLog {
-  id                      Int                   @id @default(autoincrement())                 // Identificador único do log diário
-  userId                  Int
-  user                    User                  @relation(fields: [userId], references: [id])
-  date                    DateTime              @db.Date                                      // Dia do calendário a que este log se refere
-  totalFocusMinutes       Int                   @default(0)                                   // Total de minutos de foco acumulados no dia
-  tasksCompleted          Int                   @default(0)                                   // Total de tarefas completadas no dia
-  completedSessions       Int                   @default(0)                                   // Total de sessões de foco completadas no dia
-
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  deletedAt               DateTime?
-
-  @@unique([userId, date])
-}
-
 enum BillingCycle {
   MONTHLY
   YEARLY
-  // LIFETIME // Opcional: Para acesso vitalício
-}
-
-model Plan {
-  id            Int            @id @default(autoincrement()) // Identificador único do plano
-  name          String         @unique                       // Nome do plano (ex: "Pro", "Free")
-  description   String?                                      // Descrição opcional do plano
-  price         Decimal?                                     // Preço do plano (Decimal para valores monetários, nulo para planos gratuitos)
-  billingCycle  BillingCycle?                                // Ciclo de cobrança (Mensal, Anual - nulo para gratuitos)
-  isActive      Boolean        @default(true)                // Flag para ativar/desativar o plano
-
-  features      PlanFeature[]                                // Lista de funcionalidades incluídas neste plano
-  subscriptions Subscription[]                               // Lista de assinaturas ativas deste plano
-
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  deletedAt     DateTime?                                    // Para soft delete
-}
-
-model Feature {
-  id          Int           @id @default(autoincrement()) // Identificador único da funcionalidade
-  code        String        @unique                       // Código único para a funcionalidade (ex: "VIDEO_UPLOAD", "UNLIMITED_PROJECTS")
-  name        String                                      // Nome amigável da funcionalidade
-  description String?                                     // Descrição opcional
-
-  plans       PlanFeature[]                               // Lista de planos que incluem esta funcionalidade
-
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  deletedAt   DateTime?
-}
-
-model PlanFeature {
-  id        Int       @id @default(autoincrement()) // Identificador único da relação plano-funcionalidade
-
-  planId    Int
-  plan      Plan      @relation(fields: [planId], references: [id])
-  
-  featureId Int
-  feature   Feature   @relation(fields: [featureId], references: [id])
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@unique([planId, featureId]) // Garante que uma funcionalidade só pode ser adicionada uma vez a um plano
 }
 
 enum SubscriptionStatus {
-  ACTIVE      // Assinatura válida e paga
-  CANCELED    // Cancelada pelo usuário, pode ainda estar ativa até o fim do período
-  PAST_DUE    // Falha no pagamento
-  INCOMPLETE  // Pagamento inicial pendente
-  TRIALING    // Período de teste gratuito
-}
-
-model Subscription {
-  id             Int                @id @default(autoincrement()) // Identificador único da assinatura
-  status         SubscriptionStatus                              // Status atual da assinatura (Ativa, Cancelada, etc.)
-  startDate      DateTime                                        // Data de início da assinatura (ou do período atual)
-  endDate        DateTime?                                       // Data de término do período de cobrança atual (ou da assinatura, se cancelada)
-  trialEndDate   DateTime?                                       // Data de término do período de teste, se aplicável
-  
-  userId         Int                @unique                       // Geralmente um usuário tem apenas uma assinatura ativa por vez
-  user           User               @relation(fields: [userId], references: [id])
-
-  planId         Int
-  plan           Plan               @relation(fields: [planId], references: [id])
-
-  // Opcional: IDs de provedores de pagamento (Stripe, etc.)
-  // stripeSubscriptionId String? @unique
-  // stripeCustomerId     String? @unique
-
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  deletedAt      DateTime?                                       // Para soft delete
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  INCOMPLETE
+  TRIALING
 }
 
 enum LogActionType {
-  // Ações de Usuário/Autenticação
   USER_REGISTER
   USER_LOGIN
+  USER_LOGIN_SUCCESS
+  USER_LOGIN_FAILED
   USER_PASSWORD_UPDATE
   USER_PROFILE_UPDATE
-  // Ações de Tarefas
+  USER_DELETE_ACCOUNT
   TASK_CREATE
   TASK_UPDATE
   TASK_DELETE
   TASK_COMPLETE
-  // Ações de Configurações
+  PROJECT_CREATE
+  PROJECT_UPDATE
+  PROJECT_DELETE
+  PROJECT_COMPLETE
   SETTINGS_UPDATE
-}
-
-model LogActivity {
-  id                      Int                   @id @default(autoincrement())                 // Identificador único do log de atividade
-  userId                  Int
-  user                    User                  @relation(fields: [userId], references: [id])
-  action                  LogActionType                                                       // Ação que foi executada pelo usuário
-  details                 String?               @db.Text                                      // Detalhes adicionais sobre a ação (ex: ID da tarefa criada)
-
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  deletedAt               DateTime?
+  TAG_CREATE
+  TAG_UPDATE
+  TAG_DELETE
+  COMMENT_CREATE
+  COMMENT_DELETE
+  ACHIEVEMENT_EARNED
+  MEDIA_CONNECT_SPOTIFY
+  MEDIA_CONNECT_GOOGLE
+  GENERIC_ERROR
 }
 
 enum ReportType {
@@ -323,16 +336,77 @@ enum ReportStatus {
   CLOSED
 }
 
-model Report {
-  id                      Int                   @id @default(autoincrement())                 // Identificador único do report de suporte
-  userId                  Int
-  user                    User                  @relation(fields: [userId], references: [id])
-  title                   String                                                              // Título do report
-  description             String                                                              // Descrição detalhada do report
-  type                    ReportType                                                          // Categoria do report
-  status                  ReportStatus          @default(OPEN)                                // Status atual do report
+enum CommentType {
+  PROJECT
+  TASK
+}
 
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  deletedAt               DateTime?
+enum AchievementCode {
+  STREAK_3_DAYS
+  STREAK_7_DAYS
+  STREAK_30_DAYS
+  FIRST_TASK_COMPLETED
+  TASKS_10_COMPLETED
+  TASKS_100_COMPLETED
+  FIRST_PROJECT_COMPLETED
+  FOCUS_10_HOURS
+  FOCUS_100_HOURS
+}
+
+model Tag {
+  id        Int       @id @default(autoincrement())
+  name      String
+  color     String?
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  tasks     TagTask[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, name])
+}
+
+model TagTask {
+  id        Int      @id @default(autoincrement())
+  tagId     Int
+  taskId    Int
+  createdAt DateTime @default(now())
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId, taskId])
+}
+
+model Comment {
+  id        Int       @id @default(autoincrement())
+  content   String    @db.Text
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  taskId    Int?
+  task      Task?     @relation(fields: [taskId], references: [id])
+  projectId Int?
+  project   Project?  @relation(fields: [projectId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+}
+
+model Achievement {
+  id          Int               @id @default(autoincrement())
+  code        AchievementCode   @unique
+  name        String
+  description String
+  iconUrl     String?
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  id            Int         @id @default(autoincrement())
+  earnedAt      DateTime    @default(now())
+  userId        Int
+  user          User        @relation(fields: [userId], references: [id])
+  achievementId Int
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
 }
