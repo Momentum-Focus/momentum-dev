@@ -1,8 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { LogsService } from './logs/logs.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  
+  const logsService = app.get(LogsService);
+  app.useGlobalFilters(new GlobalExceptionFilter(logsService));
 
   // Habilitar CORS
   let allowedOrigins = process.env.CORS_ORIGIN
@@ -30,15 +35,15 @@ async function bootstrap() {
       // Normalizar origin (remover trailing slash se houver)
       const normalizedOrigin = origin.replace(/\/$/, '');
 
-      // Verificar se a origin está permitida
       if (
         allowedOrigins.includes(normalizedOrigin) ||
         allowedOrigins.includes(origin)
       ) {
         callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'), false);
+        return;
       }
+
+      callback(new Error('Not allowed by CORS'), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
