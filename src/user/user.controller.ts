@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UpdateUserDTO } from './dtos/updateUser.dto';
+import { UpdateProfileDTO } from './dtos/updateProfile.dto';
 import { RolesGuard } from 'src/auth/roles/roles.guard';
 import { Roles } from 'src/auth/roles/roles.decorator';
 import { Role } from 'src/auth/roles/role.enum';
@@ -21,8 +22,9 @@ import type { Request } from 'express';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+
   @Get()
-  detailProfile(@Req() req: Request) {
+  getMe(@Req() req: Request) {
     const userProfile = req.user;
     if (!userProfile) {
       throw new UnauthorizedException('Usuário não autenticado', {
@@ -42,6 +44,26 @@ export class UserController {
     const userId = req.user!.id;
 
     return this.userService.update(userId, updateUser);
+  }
+
+  @Patch('profile')
+  updateProfile(
+    @Req() req: Request,
+    @Body() updateProfileDTO: UpdateProfileDTO,
+  ) {
+    const userId = req.user!.id;
+
+    return this.userService.updateProfile(userId, updateProfileDTO);
+  }
+
+  @Patch('complete-profile')
+  completeProfile(
+    @Req() req: Request,
+    @Body() updateData: { phone?: string; cpf?: string },
+  ) {
+    const userId = req.user!.id;
+
+    return this.userService.updateProfileWithCpf(userId, updateData);
   }
 
   @Delete()
