@@ -96,31 +96,54 @@ export class TasksService {
     return dataTask as Task;
   }
 
-  async findTasks(userId: number): Promise<Task[] | []> {
+  async findTasks(userId: number): Promise<any[]> {
     const tasks = await this.prisma.task.findMany({
       where: { userId, deletedAt: null },
-      // TODO: Implementar include de projeto quando ProjectModule estiver pronto
-      // include: {
-      //   project: {
-      //     select: {
-      //       id: true,
-      //       name: true,
-      //       color: true,
-      //     },
-      //   },
-      // },
+      include: {
+        tags: {
+          include: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                userId: true,
+              },
+            },
+          },
+        },
+      },
       orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
     });
 
+    if (tasks.length === 0) {
+      return [];
+    }
+
     return tasks.map((task) => {
-      const { createdAt, updatedAt, deletedAt, ...dataTask } = task;
-      return dataTask as Task;
+      const { createdAt, updatedAt, deletedAt, tags, ...dataTask } = task;
+      const formattedTags = tags.map((tagTask: any) => tagTask.tag);
+      return { ...dataTask, tags: formattedTags };
     });
   }
 
-  async findTaskById(id: number, userId: number): Promise<Task | null> {
+  async findTaskById(id: number, userId: number): Promise<any> {
     const task = await this.prisma.task.findFirst({
       where: { id, userId: userId, deletedAt: null },
+      include: {
+        tags: {
+          include: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                userId: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!task) {
@@ -129,8 +152,9 @@ export class TasksService {
       );
     }
 
-    const { createdAt, updatedAt, deletedAt, ...dataTask } = task;
-    return dataTask as Task;
+    const { createdAt, updatedAt, deletedAt, tags, ...dataTask } = task;
+    const formattedTags = tags.map((tagTask: any) => tagTask.tag);
+    return { ...dataTask, tags: formattedTags };
   }
 
   async deleteTask(id: number, userId: number): Promise<{ message: string }> {
