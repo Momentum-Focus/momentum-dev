@@ -9,6 +9,7 @@ import { SpotifyOAuthStrategy } from './strategy/spotify.strategy';
 import { GoogleYouTubeStrategy } from './strategy/google-youtube.strategy';
 import { YouTubeService } from './youtube.service';
 import { LogsModule } from 'src/logs/logs.module';
+import { PlanModule } from 'src/plan/plan.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { LogsModule } from 'src/logs/logs.module';
     PassportModule,
     UserModule,
     LogsModule,
+    PlanModule,
     HttpModule.register({
       timeout: 5000,
       maxRedirects: 5,

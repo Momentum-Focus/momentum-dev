@@ -1,18 +1,36 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateProjectDTO } from './dtos/create-project.dto';
 import { UpdateProjectDTO } from './dtos/update-project.dto';
 import { LogsService } from 'src/logs/logs.service';
 import { LogActionType } from '@prisma/client';
+import { PlanService } from 'src/plan/plan.service';
 
 @Injectable()
 export class ProjectService {
   constructor(
     private prisma: PrismaService,
     private logsService: LogsService,
+    private planService: PlanService,
   ) {}
 
   async create(createProjectDto: CreateProjectDTO, userId: number) {
+    const [projectCount, hasUnlimitedProjects] = await Promise.all([
+      this.prisma.project.count({
+        where: {
+          userId,
+          deletedAt: null,
+        },
+      }),
+      this.planService.userHasFeature(userId, 'UNLIMITED_PROJECTS'),
+    ]);
+
+    if (!hasUnlimitedProjects && projectCount >= 3) {
+      throw new ForbiddenException(
+        'Alcance do plano Free atingido. Faça upgrade para criar mais projetos.',
+      );
+    }
+
     const project = await this.prisma.project.create({
       data: {
         ...createProjectDto,

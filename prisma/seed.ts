@@ -1,4 +1,4 @@
-import { PrismaClient, AchievementCode } from '@prisma/client';
+import { PrismaClient, AchievementCode, BillingCycle, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -80,6 +80,92 @@ async function main() {
   }
 
   console.log(`Created ${achievements.length} achievements`);
+  const featureDefinitions = [
+    {
+      code: 'VIDEO_BACKGROUND',
+      name: 'Upload de Vídeos',
+      description: 'Permite definir vídeos personalizados como plano de fundo.',
+    },
+    {
+      code: 'UNLIMITED_PROJECTS',
+      name: 'Projetos Ilimitados',
+      description: 'Crie quantos projetos precisar sem limites.',
+    },
+    {
+      code: 'UNLIMITED_TAGS',
+      name: 'Tags Ilimitadas',
+      description: 'Organize tarefas com quantas tags quiser.',
+    },
+  ];
+
+  for (const feature of featureDefinitions) {
+    await prisma.feature.upsert({
+      where: { code: feature.code },
+      update: {
+        name: feature.name,
+        description: feature.description,
+        deletedAt: null,
+      },
+      create: feature,
+    });
+  }
+
+  const planDefinitions = [
+    {
+      name: 'FREE',
+      description: 'Plano gratuito para iniciar sua jornada de foco.',
+      price: new Prisma.Decimal('0'),
+      billingCycle: BillingCycle.MONTHLY,
+      featureCodes: [],
+    },
+    {
+      name: 'PRO',
+      description: 'Recursos premium para profissionais da concentração.',
+      price: new Prisma.Decimal('19.90'),
+      billingCycle: BillingCycle.MONTHLY,
+      featureCodes: ['VIDEO_BACKGROUND', 'UNLIMITED_PROJECTS', 'UNLIMITED_TAGS'],
+    },
+  ];
+
+  for (const definition of planDefinitions) {
+    const plan = await prisma.plan.upsert({
+      where: { name: definition.name },
+      update: {
+        description: definition.description,
+        price: definition.price,
+        billingCycle: definition.billingCycle,
+        isActive: true,
+        deletedAt: null,
+      },
+      create: {
+        name: definition.name,
+        description: definition.description,
+        price: definition.price,
+        billingCycle: definition.billingCycle,
+        isActive: true,
+      },
+    });
+
+    await prisma.planFeature.deleteMany({
+      where: { planId: plan.id },
+    });
+
+    if (definition.featureCodes.length > 0) {
+      const features = await prisma.feature.findMany({
+        where: { code: { in: definition.featureCodes } },
+      });
+
+      await prisma.planFeature.createMany({
+        data: features.map((feature) => ({
+          planId: plan.id,
+          featureId: feature.id,
+        })),
+        skipDuplicates: true,
+      });
+    }
+  }
+
+  console.log(`Created ${featureDefinitions.length} features and seeded plans`);
   console.log(`Seeding finished.`);
 }
 

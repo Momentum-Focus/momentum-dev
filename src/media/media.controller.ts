@@ -1,14 +1,18 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
+  ForbiddenException,
   Get,
   Post,
-  Res,
-  UseGuards,
-  Request,
   Query,
-  Body,
+  Request,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Express, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { MediaService } from './media.service';
 import { YouTubeService } from './youtube.service';
@@ -18,6 +22,8 @@ import { LogsService } from 'src/logs/logs.service';
 import { LogActionType } from '@prisma/client';
 import { encrypt } from './helpers/encryption.helper';
 import * as jwt from 'jsonwebtoken';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { PlanService } from 'src/plan/plan.service';
 
 @Controller('media')
 export class MediaController {
@@ -26,6 +32,7 @@ export class MediaController {
     private readonly youtubeService: YouTubeService,
     private readonly userService: UserService,
     private readonly logsService: LogsService,
+    private readonly planService: PlanService,
   ) {}
 
   @Get('spotify/login')
@@ -302,5 +309,33 @@ export class MediaController {
       video: videoInfo,
       embedUrl: `https://www.youtube.com/embed/${body.videoId}`,
     };
+  }
+
+  @Post('background/upload')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadBackground(
+    @Request() req: any,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Arquivo é obrigatório.');
+    }
+
+    const isVideo = file.mimetype.startsWith('video/');
+    if (isVideo) {
+      const hasFeature = await this.planService.userHasFeature(
+        req.user.id,
+        'VIDEO_BACKGROUND',
+      );
+
+      if (!hasFeature) {
+        throw new ForbiddenException(
+          'Upgrade para o Momentum Pro para usar fundos em vídeo.',
+        );
+      }
+    }
+
+    return await this.mediaService.handleBackgroundUpload(req.user.id, file);
   }
 }

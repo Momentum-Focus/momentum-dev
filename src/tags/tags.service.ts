@@ -1,19 +1,36 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Tag } from '@prisma/client';
 import { CreateTagDTO } from './dtos/create-tag.dto';
 import { UpdateTagDTO } from './dtos/update-tag.dto';
 import { LogsService } from 'src/logs/logs.service';
 import { LogActionType } from '@prisma/client';
+import { PlanService } from 'src/plan/plan.service';
 
 @Injectable()
 export class TagsService {
   constructor(
     private prisma: PrismaService,
     private logsService: LogsService,
+    private planService: PlanService,
   ) {}
 
   async create(userId: number, createTagDTO: CreateTagDTO): Promise<Tag> {
+    const [tagCount, hasUnlimitedTags] = await Promise.all([
+      this.prisma.tag.count({
+        where: {
+          userId,
+        },
+      }),
+      this.planService.userHasFeature(userId, 'UNLIMITED_TAGS'),
+    ]);
+
+    if (!hasUnlimitedTags && tagCount >= 5) {
+      throw new ForbiddenException(
+        'O plano Free permite até 5 tags. Faça upgrade para o Momentum Pro.',
+      );
+    }
+
     const tag = await this.prisma.tag.create({
       data: {
         ...createTagDTO,
