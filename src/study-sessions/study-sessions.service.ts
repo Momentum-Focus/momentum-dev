@@ -3,10 +3,14 @@ import { CreateStudySessionDTO } from './dtos/createStudySessions.dto';
 import { UpdateStudySessionDTO } from './dtos/updateStudySessions.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { StudySession } from '@prisma/client';
+import { AchievementsService } from 'src/achievements/achievements.service';
 
 @Injectable()
 export class StudySessionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private achievementsService: AchievementsService,
+  ) {}
 
   async createStudySession(
     createStudySession: CreateStudySessionDTO,
@@ -33,12 +37,21 @@ export class StudySessionsService {
     updateStudySession: UpdateStudySessionDTO,
     userId: number,
   ): Promise<StudySession | null> {
-    await this.findStudySessionById(id, userId);
+    const existingSession = await this.findStudySessionById(id, userId);
+
+    if (!existingSession) {
+      throw new NotFoundException('Sessão de estudo não encontrada');
+    }
 
     const updatedStudySession = await this.prisma.studySession.update({
       where: { id },
       data: { ...updateStudySession },
     });
+
+    // Verificar conquistas quando uma sessão é finalizada (endedAt é definido e não existia antes)
+    if (updateStudySession.endedAt && !existingSession.endedAt) {
+      await this.achievementsService.checkAndGrantAchievements(userId);
+    }
 
     const { createdAt, updatedAt, deletedAt, ...dataStudySession } =
       updatedStudySession;

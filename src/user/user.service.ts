@@ -328,20 +328,75 @@ export class UserService {
     userId: number,
     accessToken: string,
     refreshToken: string,
+    spotifyProduct?: string | null,
   ): Promise<User> {
-    await this.findUserByID(userId);
+    console.log('[UserService] updateSpotifyTokens chamado:', {
+      userId,
+      hasAccessToken: !!accessToken,
+      hasRefreshToken: !!refreshToken,
+      spotifyProduct,
+    });
 
+    // Verifica se userId é um número válido
+    if (typeof userId !== 'number' || isNaN(userId)) {
+      throw new Error(`userId inválido: ${userId} (tipo: ${typeof userId})`);
+    }
+
+    await this.findUserByID(userId);
+    console.log('[UserService] Usuário encontrado, atualizando tokens...');
+
+    const updateData: any = {
+      spotifyAccessToken: accessToken,
+      spotifyRefreshToken: refreshToken,
+      isSpotifyConnected: true,
+      // Permite conexões simultâneas - não desconecta o YouTube Music
+    };
+
+    // Só atualiza spotifyProduct se foi fornecido
+    // IMPORTANTE: null é um valor válido (significa que não foi possível determinar)
+    // Mas se for uma string vazia, não atualiza
+    if (spotifyProduct !== undefined) {
+      updateData.spotifyProduct = spotifyProduct;
+    }
+
+    console.log('[UserService] Dados para atualizar:', {
+      hasAccessToken: !!updateData.spotifyAccessToken,
+      hasRefreshToken: !!updateData.spotifyRefreshToken,
+      isSpotifyConnected: updateData.isSpotifyConnected,
+      spotifyProduct: updateData.spotifyProduct,
+    });
+
+    console.log('[UserService] Executando update no Prisma...');
     const updatedUser = await this.prisma.user.update({
       where: { id: userId },
-      data: {
-        spotifyAccessToken: accessToken,
-        spotifyRefreshToken: refreshToken,
+      data: updateData,
+    });
+    console.log('[UserService] Update do Prisma concluído');
+
+    console.log('[UserService] Tokens atualizados com sucesso:', {
+      userId: updatedUser.id,
+      isSpotifyConnected: updatedUser.isSpotifyConnected,
+      hasAccessToken: !!updatedUser.spotifyAccessToken,
+      hasRefreshToken: !!updatedUser.spotifyRefreshToken,
+      spotifyProduct: updatedUser.spotifyProduct,
+    });
+
+    // Força uma nova leitura do banco para garantir que os dados foram persistidos
+    console.log('[UserService] Verificando persistência no banco...');
+    const verificationUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
         isSpotifyConnected: true,
-        // Desconecta o YouTube Music (exclusividade)
-        googleAccessToken: null,
-        googleRefreshToken: null,
-        isGoogleConnected: false,
+        spotifyAccessToken: true,
+        spotifyRefreshToken: true,
+        spotifyProduct: true,
       },
+    });
+    console.log('[UserService] Verificação pós-update:', {
+      isSpotifyConnected: verificationUser?.isSpotifyConnected,
+      hasAccessToken: !!verificationUser?.spotifyAccessToken,
+      hasRefreshToken: !!verificationUser?.spotifyRefreshToken,
     });
 
     const { password, createdAt, updatedAt, deletedAt, ...dataUserUpdated } =
@@ -363,11 +418,70 @@ export class UserService {
         googleAccessToken: accessToken,
         googleRefreshToken: refreshToken,
         isGoogleConnected: true,
-        // Desconecta o Spotify (exclusividade)
+        // Permite conexões simultâneas - não desconecta o Spotify
+      },
+    });
+
+    const { password, createdAt, updatedAt, deletedAt, ...dataUserUpdated } =
+      updatedUser;
+
+    return dataUserUpdated as User;
+  }
+
+  async disconnectSpotify(userId: number): Promise<User> {
+    await this.findUserByID(userId);
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
         spotifyAccessToken: null,
         spotifyRefreshToken: null,
         isSpotifyConnected: false,
       },
+    });
+
+    const { password, createdAt, updatedAt, deletedAt, ...dataUserUpdated } =
+      updatedUser;
+
+    return dataUserUpdated as User;
+  }
+
+  async disconnectGoogle(userId: number): Promise<User> {
+    await this.findUserByID(userId);
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        googleAccessToken: null,
+        googleRefreshToken: null,
+        isGoogleConnected: false,
+      },
+    });
+
+    const { password, createdAt, updatedAt, deletedAt, ...dataUserUpdated } =
+      updatedUser;
+
+    return dataUserUpdated as User;
+  }
+
+  async updateYouTubePlaylists(
+    userId: number,
+    savedPlaylists?: string[],
+    hiddenPlaylists?: string[],
+  ): Promise<User> {
+    await this.findUserByID(userId);
+
+    const updateData: any = {};
+    if (savedPlaylists !== undefined) {
+      updateData.youtubeSavedPlaylists = savedPlaylists;
+    }
+    if (hiddenPlaylists !== undefined) {
+      updateData.youtubeHiddenPlaylists = hiddenPlaylists;
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
     });
 
     const { password, createdAt, updatedAt, deletedAt, ...dataUserUpdated } =

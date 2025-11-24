@@ -22,7 +22,34 @@ export class PlanController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getMyPlan(@Request() req: any) {
-    return await this.planService.getUserSubscription(req.user.id);
+    const subscription = await this.planService.getUserSubscription(
+      req.user.id,
+    );
+
+    // Se não há subscription, retornar plano VIBES (gratuito)
+    if (!subscription) {
+      const allPlans = await this.planService.getActivePlans();
+      const vibesPlan = allPlans.find((p) => p.name === 'VIBES');
+
+      if (vibesPlan) {
+        return {
+          plan: {
+            name: vibesPlan.name,
+            features: vibesPlan.features,
+          },
+        };
+      }
+
+      // Fallback: retornar null se VIBES não existir
+      return { plan: null };
+    }
+
+    return {
+      plan: {
+        name: subscription.plan.name,
+        features: subscription.plan.features,
+      },
+    };
   }
 
   @UseGuards(JwtAuthGuard)

@@ -1,10 +1,15 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateProjectDTO } from './dtos/create-project.dto';
 import { UpdateProjectDTO } from './dtos/update-project.dto';
 import { LogsService } from 'src/logs/logs.service';
 import { LogActionType } from '@prisma/client';
 import { PlanService } from 'src/plan/plan.service';
+import { AchievementsService } from 'src/achievements/achievements.service';
 
 @Injectable()
 export class ProjectService {
@@ -12,6 +17,7 @@ export class ProjectService {
     private prisma: PrismaService,
     private logsService: LogsService,
     private planService: PlanService,
+    private achievementsService: AchievementsService,
   ) {}
 
   async create(createProjectDto: CreateProjectDTO, userId: number) {
@@ -98,6 +104,7 @@ export class ProjectService {
         LogActionType.PROJECT_COMPLETE,
         `Project completed: ${project.name}`,
       );
+      await this.achievementsService.checkAndGrantAchievements(userId);
     }
 
     if (updateProjectDto.status !== 'COMPLETED' || project.completedAt) {

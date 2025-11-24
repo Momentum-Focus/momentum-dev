@@ -37,6 +37,24 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (exception instanceof Error && !(exception instanceof HttpException)) {
       message = exception.message;
       stackTrace = exception.stack;
+
+      // Tratamento especial para erros do Passport/Spotify
+      if (
+        message.includes('failed to fetch user profile') ||
+        message.includes('Failed to fetch user profile')
+      ) {
+        status = HttpStatus.INTERNAL_SERVER_ERROR;
+        message =
+          'Erro ao conectar com o Spotify. Por favor, tente novamente em alguns instantes.';
+
+        // Log mais detalhado para debug
+        console.error('Erro do Passport/Spotify:', {
+          message: exception.message,
+          stack: exception.stack,
+          url: request.url,
+          userId,
+        });
+      }
     }
 
     await this.loggingService.createLog(
@@ -53,4 +71,3 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     });
   }
 }
-

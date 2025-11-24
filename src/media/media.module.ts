@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
+import { JwtModule } from '@nestjs/jwt';
 import { HttpModule } from '@nestjs/axios';
 import { MediaController } from './media.controller';
 import { MediaService } from './media.service';
 import { UserModule } from 'src/user/user.module';
+import { PrismaModule } from 'src/prisma/prisma.module';
 import { SpotifyOAuthStrategy } from './strategy/spotify.strategy';
 import { GoogleYouTubeStrategy } from './strategy/google-youtube.strategy';
 import { YouTubeService } from './youtube.service';
@@ -15,7 +17,12 @@ import { PlanModule } from 'src/plan/plan.module';
   imports: [
     ConfigModule,
     PassportModule,
+    JwtModule.register({
+      secret: process.env.JWT_SECRET,
+      signOptions: { expiresIn: '1d' },
+    }),
     UserModule,
+    PrismaModule,
     LogsModule,
     PlanModule,
     HttpModule.register({

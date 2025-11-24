@@ -1,0 +1,41 @@
+services:
+  # Aplicação NestJS - Produção
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: momentum-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL}
+    ports:
+      - '3000:3000'
+    volumes:
+      # Apenas uploads persistidos (código não é montado em produção)
+      - ./uploads:/app/uploads
+    networks:
+      - momentum-network
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:3000/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Limites de recursos (opcional, ajuste conforme necessário)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+networks:
+  momentum-network:
+    driver: bridge
