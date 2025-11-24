@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Tag } from '@prisma/client';
 import { CreateTagDTO } from './dtos/create-tag.dto';
@@ -20,6 +24,7 @@ export class TagsService {
       this.prisma.tag.count({
         where: {
           userId,
+          deletedAt: null,
         },
       }),
       this.planService.userHasFeature(userId, 'UNLIMITED_TAGS'),
@@ -51,6 +56,7 @@ export class TagsService {
     return await this.prisma.tag.findMany({
       where: {
         userId,
+        deletedAt: null,
       },
     });
   }
@@ -60,6 +66,7 @@ export class TagsService {
       where: {
         id,
         userId,
+        deletedAt: null,
       },
     });
 
@@ -94,8 +101,12 @@ export class TagsService {
   async remove(userId: number, id: number): Promise<void> {
     const tag = await this.findOne(userId, id);
 
-    await this.prisma.tag.delete({
+    // Soft delete: apenas marca deletedAt
+    await this.prisma.tag.update({
       where: { id },
+      data: {
+        deletedAt: new Date(),
+      },
     });
 
     await this.logsService.createLog(
@@ -105,7 +116,11 @@ export class TagsService {
     );
   }
 
-  async addTagToTask(userId: number, taskId: number, tagId: number): Promise<void> {
+  async addTagToTask(
+    userId: number,
+    taskId: number,
+    tagId: number,
+  ): Promise<void> {
     await this.findOne(userId, tagId);
 
     await this.prisma.tagTask.create({
@@ -116,7 +131,11 @@ export class TagsService {
     });
   }
 
-  async removeTagFromTask(userId: number, taskId: number, tagId: number): Promise<void> {
+  async removeTagFromTask(
+    userId: number,
+    taskId: number,
+    tagId: number,
+  ): Promise<void> {
     await this.findOne(userId, tagId);
 
     await this.prisma.tagTask.deleteMany({
@@ -127,4 +146,3 @@ export class TagsService {
     });
   }
 }
-

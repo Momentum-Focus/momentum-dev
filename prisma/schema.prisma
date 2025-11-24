@@ -32,11 +32,15 @@ model User {
   isSpotifyConnected  Boolean           @default(false)
   spotifyAccessToken  String?
   spotifyRefreshToken String?
+  spotifyFocusPlaylistUri String?
+  spotifyProduct      String?           // 'premium', 'free', ou 'open'
   authMethod          AuthMethod        @default(EMAIL)
   googleAccessToken   String?
   googleId            String?           @unique
   googleRefreshToken  String?
   isGoogleConnected   Boolean           @default(false)
+  youtubeSavedPlaylists Json            @default("[]") // IDs de playlists importadas
+  youtubeHiddenPlaylists Json           @default("[]") // IDs de playlists ocultadas
   dailyLogs           DailyLog[]
   logs                LogActivity[]
   media               Media[]
@@ -319,6 +323,8 @@ enum LogActionType {
   ACHIEVEMENT_EARNED
   MEDIA_CONNECT_SPOTIFY
   MEDIA_CONNECT_GOOGLE
+  MEDIA_DISCONNECT_SPOTIFY
+  MEDIA_DISCONNECT_GOOGLE
   GENERIC_ERROR
 }
 
@@ -362,6 +368,7 @@ model Tag {
   tasks     TagTask[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@unique([userId, name])
 }
