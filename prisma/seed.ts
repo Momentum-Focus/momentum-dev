@@ -1,4 +1,9 @@
-import { PrismaClient, AchievementCode, BillingCycle, Prisma } from '@prisma/client';
+import {
+  PrismaClient,
+  AchievementCode,
+  BillingCycle,
+  Prisma,
+} from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -80,21 +85,43 @@ async function main() {
   }
 
   console.log(`Created ${achievements.length} achievements`);
+
+  // Features do sistema
   const featureDefinitions = [
     {
       code: 'VIDEO_BACKGROUND',
-      name: 'Upload de Vídeos',
+      name: 'Fundo em Vídeo',
       description: 'Permite definir vídeos personalizados como plano de fundo.',
     },
     {
-      code: 'UNLIMITED_PROJECTS',
-      name: 'Projetos Ilimitados',
-      description: 'Crie quantos projetos precisar sem limites.',
+      code: 'PROJECTS',
+      name: 'Projetos',
+      description: 'Crie e gerencie projetos para organizar suas tarefas.',
     },
     {
-      code: 'UNLIMITED_TAGS',
-      name: 'Tags Ilimitadas',
-      description: 'Organize tarefas com quantas tags quiser.',
+      code: 'BASIC_REPORTS',
+      name: 'Relatórios Básicos',
+      description: 'Visualize seu tempo focado e histórico de sessões.',
+    },
+    {
+      code: 'ADVANCED_REPORTS',
+      name: 'Relatórios Avançados',
+      description: 'Insights detalhados e análises avançadas de produtividade.',
+    },
+    {
+      code: 'FULL_CUSTOMIZATION',
+      name: 'Customização Total',
+      description: 'Personalize completamente a interface e experiência.',
+    },
+    {
+      code: 'EXTRA_INTEGRATIONS',
+      name: 'Integrações Extras',
+      description: 'Acesso a integrações adicionais e APIs.',
+    },
+    {
+      code: 'PRIORITY_SUPPORT',
+      name: 'Suporte Prioritário',
+      description: 'Atendimento prioritário e suporte dedicado.',
     },
   ];
 
@@ -110,20 +137,39 @@ async function main() {
     });
   }
 
+  // Planos: Vibes (Gratuito), Flow (Intermediário), Epic (Premium)
   const planDefinitions = [
     {
-      name: 'FREE',
-      description: 'Plano gratuito para iniciar sua jornada de foco.',
+      name: 'VIBES',
+      description:
+        'Plano gratuito com timer básico, gestão de tarefas e fundos em imagem.',
       price: new Prisma.Decimal('0'),
       billingCycle: BillingCycle.MONTHLY,
-      featureCodes: [],
+      featureCodes: [], // Vibes não tem features premium
     },
     {
-      name: 'PRO',
-      description: 'Recursos premium para profissionais da concentração.',
+      name: 'FLOW',
+      description:
+        'Tudo do Vibes + fundos em vídeo, projetos e relatórios básicos.',
       price: new Prisma.Decimal('19.90'),
       billingCycle: BillingCycle.MONTHLY,
-      featureCodes: ['VIDEO_BACKGROUND', 'UNLIMITED_PROJECTS', 'UNLIMITED_TAGS'],
+      featureCodes: ['VIDEO_BACKGROUND', 'PROJECTS', 'BASIC_REPORTS'],
+    },
+    {
+      name: 'EPIC',
+      description:
+        'Tudo do Flow + relatórios avançados, customização total e suporte prioritário.',
+      price: new Prisma.Decimal('39.90'),
+      billingCycle: BillingCycle.MONTHLY,
+      featureCodes: [
+        'VIDEO_BACKGROUND',
+        'PROJECTS',
+        'BASIC_REPORTS',
+        'ADVANCED_REPORTS',
+        'FULL_CUSTOMIZATION',
+        'EXTRA_INTEGRATIONS',
+        'PRIORITY_SUPPORT',
+      ],
     },
   ];
 
