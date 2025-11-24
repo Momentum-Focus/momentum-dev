@@ -10,6 +10,7 @@ import { RolesGuard } from './roles/roles.guard';
 import { JwtAuthGuard } from './strategy/jwt-auth.guard';
 import { JwtStrategy } from './strategy/jwt.strategy';
 import { LocalStrategy } from './strategy/localStrategy';
+import { GoogleLoginStrategy } from './strategy/google-login.strategy';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { LocalStrategy } from './strategy/localStrategy';
     LocalStrategy,
     JwtStrategy,
     JwtAuthGuard,
+    GoogleLoginStrategy,
   ],
   exports: [AuthService, JwtAuthGuard],
 })

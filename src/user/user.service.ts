@@ -9,13 +9,17 @@ import { User } from '@prisma/client';
 import { RegisterUserDTO } from './dtos/registerUser.dto';
 import * as bcrypt from 'bcrypt';
 import { UpdateUserDTO } from './dtos/updateUser.dto';
+import { UpdateProfileDTO } from './dtos/updateProfile.dto';
 import { UserRoleService } from 'src/user-role/user-role.service';
+import { LogsService } from 'src/logs/logs.service';
+import { LogActionType } from '@prisma/client';
 
 @Injectable()
 export class UserService {
   constructor(
     private prisma: PrismaService,
     private userRoleService: UserRoleService,
+    private logsService: LogsService,
   ) {}
 
   async create(registerUser: RegisterUserDTO): Promise<User | null> {
@@ -97,18 +101,19 @@ export class UserService {
     if (updateUser.phone) {
       const validatePhone = await this.prisma.user.findFirst({
         where: {
-          email: updateUser.phone,
+          phone: updateUser.phone,
           deletedAt: null,
           NOT: { id: userId },
         },
       });
 
-      if (validatePhone)
+      if (validatePhone) {
         throw new ConflictException('Telefone já cadastrado!', {
           cause: new Error(),
           description:
             'Existe um usuário com esse telefone cadastrado, insira um telefone diferente e tente novamente!',
         });
+      }
     }
 
     const updatedUser = await this.prisma.user.update({
@@ -118,10 +123,118 @@ export class UserService {
       },
     });
 
+    await this.logsService.createLog(
+      userId,
+      LogActionType.USER_PROFILE_UPDATE,
+      'User profile updated',
+    );
+
     const { password, createdAt, updatedAt, deletedAt, ...dataUserUpdated } =
       updatedUser;
 
     return dataUserUpdated as User;
+  }
+
+  async updateProfile(
+    userId: number,
+    updateProfileDTO: UpdateProfileDTO,
+  ): Promise<User> {
+    await this.findUserByID(userId);
+
+    if (updateProfileDTO.email) {
+      const validateEmail = await this.prisma.user.findFirst({
+        where: {
+          email: updateProfileDTO.email,
+          deletedAt: null,
+          NOT: { id: userId },
+        },
+      });
+
+      if (validateEmail) {
+        throw new ConflictException('Email já cadastrado');
+      }
+    }
+
+    if (updateProfileDTO.phone) {
+      const validatePhone = await this.prisma.user.findFirst({
+        where: {
+          phone: updateProfileDTO.phone,
+          deletedAt: null,
+          NOT: { id: userId },
+        },
+      });
+
+      if (validatePhone) {
+        throw new ConflictException('Telefone já cadastrado');
+      }
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateProfileDTO,
+    });
+
+    await this.logsService.createLog(
+      userId,
+      LogActionType.USER_PROFILE_UPDATE,
+      'Profile updated',
+    );
+
+    const { password, createdAt, updatedAt, deletedAt, ...userData } =
+      updatedUser;
+
+    return userData as User;
+  }
+
+  async updateProfileWithCpf(
+    userId: number,
+    updateData: { phone?: string; cpf?: string },
+  ): Promise<User> {
+    await this.findUserByID(userId);
+
+    if (updateData.phone) {
+      const validatePhone = await this.prisma.user.findFirst({
+        where: {
+          phone: updateData.phone,
+          deletedAt: null,
+          NOT: { id: userId },
+        },
+      });
+
+      if (validatePhone) {
+        throw new ConflictException('Telefone já cadastrado');
+      }
+    }
+
+    if (updateData.cpf) {
+      const validateCpf = await this.prisma.user.findFirst({
+        where: {
+          cpf: updateData.cpf,
+          deletedAt: null,
+          NOT: { id: userId },
+        },
+      });
+
+      if (validateCpf) {
+        throw new ConflictException('CPF já cadastrado');
+      }
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+    });
+
+    await this.logsService.createLog(
+      userId,
+      LogActionType.USER_PROFILE_UPDATE,
+      'Profile completed',
+    );
+
+    const { password, createdAt, updatedAt, deletedAt, ...userData } =
+      updatedUser;
+
+    return userData as User;
   }
 
   async listUsers(): Promise<User[] | []> {
@@ -193,14 +306,7 @@ export class UserService {
   }
 
   async deleteMyAccount(userId: number): Promise<{ message: string }> {
-    const validateUser = await this.findUserByID(userId);
-
-    if (!validateUser)
-      throw new NotFoundException('Usuário não encontrado!', {
-        cause: new Error(),
-        description:
-          'Usuário não foi encontrado, verifique o ID enviado e tente novamente.',
-      });
+    await this.findUserByID(userId);
 
     await this.prisma.user.update({
       where: { id: userId },
@@ -209,6 +315,178 @@ export class UserService {
 
     await this.userRoleService.deleteUserRolesByUserId(userId);
 
+    await this.logsService.createLog(
+      userId,
+      LogActionType.USER_DELETE_ACCOUNT,
+      'Account soft-deleted',
+    );
+
     return { message: 'Usuário deletado com sucesso!' };
+  }
+
+  async updateSpotifyTokens(
+    userId: number,
+    accessToken: string,
+    refreshToken: string,
+    spotifyProduct?: string | null,
+  ): Promise<User> {
+    console.log('[UserService] updateSpotifyTokens chamado:', {
+      userId,
+      hasAccessToken: !!accessToken,
+      hasRefreshToken: !!refreshToken,
+      spotifyProduct,
+    });
+
+    // Verifica se userId é um número válido
+    if (typeof userId !== 'number' || isNaN(userId)) {
+      throw new Error(`userId inválido: ${userId} (tipo: ${typeof userId})`);
+    }
+
+    await this.findUserByID(userId);
+    console.log('[UserService] Usuário encontrado, atualizando tokens...');
+
+    const updateData: any = {
+      spotifyAccessToken: accessToken,
+      spotifyRefreshToken: refreshToken,
+      isSpotifyConnected: true,
+      // Permite conexões simultâneas - não desconecta o YouTube Music
+    };
+
+    // Só atualiza spotifyProduct se foi fornecido
+    // IMPORTANTE: null é um valor válido (significa que não foi possível determinar)
+    // Mas se for uma string vazia, não atualiza
+    if (spotifyProduct !== undefined) {
+      updateData.spotifyProduct = spotifyProduct;
+    }
+
+    console.log('[UserService] Dados para atualizar:', {
+      hasAccessToken: !!updateData.spotifyAccessToken,
+      hasRefreshToken: !!updateData.spotifyRefreshToken,
+      isSpotifyConnected: updateData.isSpotifyConnected,
+      spotifyProduct: updateData.spotifyProduct,
+    });
+
+    console.log('[UserService] Executando update no Prisma...');
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+    });
+    console.log('[UserService] Update do Prisma concluído');
+
+    console.log('[UserService] Tokens atualizados com sucesso:', {
+      userId: updatedUser.id,
+      isSpotifyConnected: updatedUser.isSpotifyConnected,
+      hasAccessToken: !!updatedUser.spotifyAccessToken,
+      hasRefreshToken: !!updatedUser.spotifyRefreshToken,
+      spotifyProduct: updatedUser.spotifyProduct,
+    });
+
+    // Força uma nova leitura do banco para garantir que os dados foram persistidos
+    console.log('[UserService] Verificando persistência no banco...');
+    const verificationUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        isSpotifyConnected: true,
+        spotifyAccessToken: true,
+        spotifyRefreshToken: true,
+        spotifyProduct: true,
+      },
+    });
+    console.log('[UserService] Verificação pós-update:', {
+      isSpotifyConnected: verificationUser?.isSpotifyConnected,
+      hasAccessToken: !!verificationUser?.spotifyAccessToken,
+      hasRefreshToken: !!verificationUser?.spotifyRefreshToken,
+    });
+
+    const { password, createdAt, updatedAt, deletedAt, ...dataUserUpdated } =
+      updatedUser;
+
+    return dataUserUpdated as User;
+  }
+
+  async updateGoogleTokens(
+    userId: number,
+    accessToken: string,
+    refreshToken: string | null,
+  ): Promise<User> {
+    await this.findUserByID(userId);
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        googleAccessToken: accessToken,
+        googleRefreshToken: refreshToken,
+        isGoogleConnected: true,
+        // Permite conexões simultâneas - não desconecta o Spotify
+      },
+    });
+
+    const { password, createdAt, updatedAt, deletedAt, ...dataUserUpdated } =
+      updatedUser;
+
+    return dataUserUpdated as User;
+  }
+
+  async disconnectSpotify(userId: number): Promise<User> {
+    await this.findUserByID(userId);
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        spotifyAccessToken: null,
+        spotifyRefreshToken: null,
+        isSpotifyConnected: false,
+      },
+    });
+
+    const { password, createdAt, updatedAt, deletedAt, ...dataUserUpdated } =
+      updatedUser;
+
+    return dataUserUpdated as User;
+  }
+
+  async disconnectGoogle(userId: number): Promise<User> {
+    await this.findUserByID(userId);
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        googleAccessToken: null,
+        googleRefreshToken: null,
+        isGoogleConnected: false,
+      },
+    });
+
+    const { password, createdAt, updatedAt, deletedAt, ...dataUserUpdated } =
+      updatedUser;
+
+    return dataUserUpdated as User;
+  }
+
+  async updateYouTubePlaylists(
+    userId: number,
+    savedPlaylists?: string[],
+    hiddenPlaylists?: string[],
+  ): Promise<User> {
+    await this.findUserByID(userId);
+
+    const updateData: any = {};
+    if (savedPlaylists !== undefined) {
+      updateData.youtubeSavedPlaylists = savedPlaylists;
+    }
+    if (hiddenPlaylists !== undefined) {
+      updateData.youtubeHiddenPlaylists = hiddenPlaylists;
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+    });
+
+    const { password, createdAt, updatedAt, deletedAt, ...dataUserUpdated } =
+      updatedUser;
+
+    return dataUserUpdated as User;
   }
 }

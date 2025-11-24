@@ -2,12 +2,15 @@ import {
   Body,
   Controller,
   Post,
+  Get,
   UseGuards,
   Request,
+  Res,
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import type { Response } from 'express';
 import { RegisterUserDTO } from 'src/user/dtos/registerUser.dto';
 import { AuthService } from './auth.service';
 
@@ -35,9 +38,23 @@ export class AuthController {
     }
   }
 
-  @UseGuards(AuthGuard('local'))
   @Post('/login')
-  login(@Request() req: any) {
-    return this.authService.generateToken(req.user);
+  async login(@Body() loginDTO: { email: string; password: string }) {
+    return await this.authService.login(loginDTO.email, loginDTO.password);
+  }
+
+  @Get('google/login')
+  @UseGuards(AuthGuard('google-login'))
+  handleGoogleLogin() {
+    // O Guard redireciona automaticamente para o Google
+  }
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google-login'))
+  async handleGoogleCallback(@Request() req: any, @Res() res: Response) {
+    const result = await this.authService.generateToken(req.user);
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+    res.redirect(`${frontendUrl}/auth/callback?token=${result.token}`);
   }
 }

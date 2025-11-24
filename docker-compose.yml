@@ -1,22 +1,42 @@
 services:
-  # Aplicação NestJS
+  # Aplicação NestJS - Desenvolvimento
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: momentum-app
+      target: development
+    container_name: momentum-app-dev
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      NODE_ENV: production
-      PORT: 3000
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL}
     ports:
       - '3000:3000'
+      - '9229:9229' # Porta para debug Node.js
     volumes:
+      # Montar código fonte para hot-reload
+      - .:/app
+      # Preservar node_modules do container (evita conflitos)
+      - /app/node_modules
+      # Uploads persistidos
       - ./uploads:/app/uploads
+    command: npm run start:dev
+    networks:
+      - momentum-network
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:3000/health || exit 1']
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:3000/health 2>/dev/null || exit 1',
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
+
+networks:
+  momentum-network:
+    driver: bridge

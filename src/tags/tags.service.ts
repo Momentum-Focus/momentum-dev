@@ -1,0 +1,148 @@
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { Tag } from '@prisma/client';
+import { CreateTagDTO } from './dtos/create-tag.dto';
+import { UpdateTagDTO } from './dtos/update-tag.dto';
+import { LogsService } from 'src/logs/logs.service';
+import { LogActionType } from '@prisma/client';
+import { PlanService } from 'src/plan/plan.service';
+
+@Injectable()
+export class TagsService {
+  constructor(
+    private prisma: PrismaService,
+    private logsService: LogsService,
+    private planService: PlanService,
+  ) {}
+
+  async create(userId: number, createTagDTO: CreateTagDTO): Promise<Tag> {
+    const [tagCount, hasUnlimitedTags] = await Promise.all([
+      this.prisma.tag.count({
+        where: {
+          userId,
+          deletedAt: null,
+        },
+      }),
+      this.planService.userHasFeature(userId, 'UNLIMITED_TAGS'),
+    ]);
+
+    if (!hasUnlimitedTags && tagCount >= 5) {
+      throw new ForbiddenException(
+        'O plano Free permite até 5 tags. Faça upgrade para o Momentum Pro.',
+      );
+    }
+
+    const tag = await this.prisma.tag.create({
+      data: {
+        ...createTagDTO,
+        userId,
+      },
+    });
+
+    await this.logsService.createLog(
+      userId,
+      LogActionType.TAG_CREATE,
+      `Tag created: ${tag.name}`,
+    );
+
+    return tag;
+  }
+
+  async findAll(userId: number): Promise<Tag[]> {
+    return await this.prisma.tag.findMany({
+      where: {
+        userId,
+        deletedAt: null,
+      },
+    });
+  }
+
+  async findOne(userId: number, id: number): Promise<Tag> {
+    const tag = await this.prisma.tag.findFirst({
+      where: {
+        id,
+        userId,
+        deletedAt: null,
+      },
+    });
+
+    if (!tag) {
+      throw new NotFoundException('Tag não encontrada');
+    }
+
+    return tag;
+  }
+
+  async update(
+    userId: number,
+    id: number,
+    updateTagDTO: UpdateTagDTO,
+  ): Promise<Tag> {
+    await this.findOne(userId, id);
+
+    const tag = await this.prisma.tag.update({
+      where: { id },
+      data: updateTagDTO,
+    });
+
+    await this.logsService.createLog(
+      userId,
+      LogActionType.TAG_UPDATE,
+      `Tag updated: ${tag.name}`,
+    );
+
+    return tag;
+  }
+
+  async remove(userId: number, id: number): Promise<void> {
+    const tag = await this.findOne(userId, id);
+
+    // Soft delete: apenas marca deletedAt
+    await this.prisma.tag.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+
+    await this.logsService.createLog(
+      userId,
+      LogActionType.TAG_DELETE,
+      `Tag deleted: ${tag.name}`,
+    );
+  }
+
+  async addTagToTask(
+    userId: number,
+    taskId: number,
+    tagId: number,
+  ): Promise<void> {
+    await this.findOne(userId, tagId);
+
+    await this.prisma.tagTask.create({
+      data: {
+        tagId,
+        taskId,
+      },
+    });
+  }
+
+  async removeTagFromTask(
+    userId: number,
+    taskId: number,
+    tagId: number,
+  ): Promise<void> {
+    await this.findOne(userId, tagId);
+
+    await this.prisma.tagTask.deleteMany({
+      where: {
+        tagId,
+        taskId,
+      },
+    });
+  }
+}

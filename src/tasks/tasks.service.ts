@@ -1,16 +1,21 @@
 import {
   Injectable,
   NotFoundException,
-  // ForbiddenException, // TODO: Remover comentário quando ProjectModule estiver pronto
 } from '@nestjs/common';
 import { CreateTaskDTO } from './dtos/createTask.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Task, Prisma } from '@prisma/client';
+import { Task, Prisma, LogActionType } from '@prisma/client';
 import { UpdateTaskDTO } from './dtos/updateTask.dto';
+import { LogsService } from 'src/logs/logs.service';
+import { AchievementsService } from 'src/achievements/achievements.service';
 
 @Injectable()
 export class TasksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private logsService: LogsService,
+    private achievementsService: AchievementsService,
+  ) {}
 
   async createTask(
     createTaskDto: CreateTaskDTO,
@@ -40,6 +45,12 @@ export class TasksService {
       },
     });
 
+    await this.logsService.createLog(
+      userId,
+      LogActionType.TASK_CREATE,
+      `Task created: ${task.title}`,
+    );
+
     const { createdAt, updatedAt, deletedAt, ...dataTask } = task;
     return dataTask as Task;
   }
@@ -64,35 +75,75 @@ export class TasksService {
       data: data,
     });
 
+    if (updateTask.isCompleted === true) {
+      await this.logsService.createLog(
+        userId,
+        LogActionType.TASK_COMPLETE,
+        `Task completed: ${updatedTask.title}`,
+      );
+      await this.achievementsService.checkAndGrantAchievements(userId);
+    }
+
+    if (updateTask.isCompleted !== true) {
+      await this.logsService.createLog(
+        userId,
+        LogActionType.TASK_UPDATE,
+        `Task updated: ${updatedTask.title}`,
+      );
+    }
+
     const { createdAt, updatedAt, deletedAt, ...dataTask } = updatedTask;
     return dataTask as Task;
   }
 
-  async findTasks(userId: number): Promise<Task[] | []> {
+  async findTasks(userId: number): Promise<any[]> {
     const tasks = await this.prisma.task.findMany({
       where: { userId, deletedAt: null },
-      // TODO: Implementar include de projeto quando ProjectModule estiver pronto
-      // include: {
-      //   project: {
-      //     select: {
-      //       id: true,
-      //       name: true,
-      //       color: true,
-      //     },
-      //   },
-      // },
+      include: {
+        tags: {
+          include: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                userId: true,
+              },
+            },
+          },
+        },
+      },
       orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
     });
 
+    if (tasks.length === 0) {
+      return [];
+    }
+
     return tasks.map((task) => {
-      const { createdAt, updatedAt, deletedAt, ...dataTask } = task;
-      return dataTask as Task;
+      const { createdAt, updatedAt, deletedAt, tags, ...dataTask } = task;
+      const formattedTags = tags.map((tagTask: any) => tagTask.tag);
+      return { ...dataTask, tags: formattedTags };
     });
   }
 
-  async findTaskById(id: number, userId: number): Promise<Task | null> {
+  async findTaskById(id: number, userId: number): Promise<any> {
     const task = await this.prisma.task.findFirst({
       where: { id, userId: userId, deletedAt: null },
+      include: {
+        tags: {
+          include: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                userId: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!task) {
@@ -101,12 +152,17 @@ export class TasksService {
       );
     }
 
-    const { createdAt, updatedAt, deletedAt, ...dataTask } = task;
-    return dataTask as Task;
+    const { createdAt, updatedAt, deletedAt, tags, ...dataTask } = task;
+    const formattedTags = tags.map((tagTask: any) => tagTask.tag);
+    return { ...dataTask, tags: formattedTags };
   }
 
   async deleteTask(id: number, userId: number): Promise<{ message: string }> {
-    await this.findTaskById(id, userId);
+    const task = await this.findTaskById(id, userId);
+
+    if (!task) {
+      throw new NotFoundException('Tarefa não encontrada');
+    }
 
     await this.prisma.task.update({
       where: { id },
@@ -114,6 +170,12 @@ export class TasksService {
         deletedAt: new Date(),
       },
     });
+
+    await this.logsService.createLog(
+      userId,
+      LogActionType.TASK_DELETE,
+      `Task deleted: ${task.title}`,
+    );
 
     return { message: 'Tarefa deletada com sucesso.' };
   }
