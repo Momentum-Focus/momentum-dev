@@ -14,15 +14,25 @@ export class GoogleLoginStrategy extends PassportStrategy(
     private configService: ConfigService,
   ) {
     const clientID = configService.get<string>('GOOGLE_CLIENT_ID') || '';
-    const clientSecret = configService.get<string>('GOOGLE_CLIENT_SECRET') || '';
-    const callbackURL =
-      configService.get<string>('GOOGLE_REDIRECT_URI') ||
-      'http://localhost:3000/auth/google/callback';
+    const clientSecret =
+      configService.get<string>('GOOGLE_CLIENT_SECRET') || '';
+    const callbackURL = configService.get<string>('GOOGLE_REDIRECT_URI');
+
+    // Debug log to verify the exact URL being used
+    console.log('[GoogleLoginStrategy] GOOGLE_REDIRECT_URI:', callbackURL);
+    console.log(
+      '[GoogleLoginStrategy] Raw env value:',
+      process.env.GOOGLE_REDIRECT_URI,
+    );
 
     if (!clientID || !clientSecret) {
       throw new Error(
         'GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET devem estar configurados no .env',
       );
+    }
+
+    if (!callbackURL) {
+      throw new Error('GOOGLE_REDIRECT_URI deve estar configurado no .env');
     }
 
     super({
@@ -42,4 +52,3 @@ export class GoogleLoginStrategy extends PassportStrategy(
     return result.user;
   }
 }
-
