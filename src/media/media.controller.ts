@@ -865,14 +865,27 @@ export class MediaController {
     const state = Buffer.from(JSON.stringify({ token, userId })).toString(
       'base64',
     );
-    const redirectUri =
-      process.env.NODE_ENV === 'production'
-        ? process.env.GOOGLE_YOUTUBE_REDIRECT_URI_PROD ||
-          'https://momentum-api.onrender.com/media/google/callback'
-        : process.env.GOOGLE_YOUTUBE_REDIRECT_URI ||
-          'http://localhost:3000/media/google/callback';
+    const redirectUri = process.env.GOOGLE_YOUTUBE_REDIRECT_URI;
+
+    // Debug log to verify the exact URL being used
+    this.logger.log(
+      '[GOOGLE CONNECT] GOOGLE_YOUTUBE_REDIRECT_URI:',
+      redirectUri,
+    );
+
+    if (!redirectUri) {
+      return res.status(500).json({
+        message: 'GOOGLE_YOUTUBE_REDIRECT_URI não está configurado',
+      });
+    }
 
     const clientID = process.env.GOOGLE_CLIENT_ID;
+    if (!clientID) {
+      return res.status(500).json({
+        message: 'GOOGLE_CLIENT_ID não está configurado',
+      });
+    }
+
     const scope = 'https://www.googleapis.com/auth/youtube';
     const responseType = 'code';
     const redirectURL = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=${responseType}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}&access_type=offline&prompt=consent`;
@@ -961,12 +974,20 @@ export class MediaController {
 
       this.logger.log('[GOOGLE CALLBACK] userId extraído:', userId);
 
-      const redirectUri =
-        process.env.NODE_ENV === 'production'
-          ? process.env.GOOGLE_YOUTUBE_REDIRECT_URI_PROD ||
-            'https://momentum-api.onrender.com/media/google/callback'
-          : process.env.GOOGLE_YOUTUBE_REDIRECT_URI ||
-            'http://localhost:3000/media/google/callback';
+      const redirectUri = process.env.GOOGLE_YOUTUBE_REDIRECT_URI;
+
+      // Debug log to verify the exact URL being used
+      this.logger.log(
+        '[GOOGLE CALLBACK] GOOGLE_YOUTUBE_REDIRECT_URI:',
+        redirectUri,
+      );
+
+      if (!redirectUri) {
+        this.logger.error(
+          '[GOOGLE CALLBACK] GOOGLE_YOUTUBE_REDIRECT_URI não está configurado',
+        );
+        return sendErrorHTML('Configuração de redirect URI não encontrada');
+      }
 
       const clientID = process.env.GOOGLE_CLIENT_ID;
       const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
