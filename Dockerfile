@@ -101,4 +101,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
 # Comando de entrada: migrações + seed + start
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run seed && node dist/src/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/prisma/seed.js && node dist/src/main.js"]
