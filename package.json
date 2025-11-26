@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "prisma": "npx prisma",
-    "seed": "npx tsx prisma/seed.ts",
+    "seed": "node --loader tsx prisma/seed.ts",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

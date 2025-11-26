@@ -18,19 +18,33 @@ export class GoogleYouTubeStrategy extends PassportStrategy(
     private configService: ConfigService,
     private logsService: LogsService,
   ) {
-    const isProduction = process.env.NODE_ENV === 'production';
-    const redirectUri = isProduction
-      ? configService.get<string>('GOOGLE_YOUTUBE_REDIRECT_URI_PROD') ||
-        'https://momentum-api.onrender.com/media/google/callback'
-      : configService.get<string>('GOOGLE_YOUTUBE_REDIRECT_URI') ||
-        'http://localhost:3000/media/google/callback';
+    const redirectUri = configService.get<string>(
+      'GOOGLE_YOUTUBE_REDIRECT_URI',
+    );
+
+    // Debug log to verify the exact URL being used
+    console.log(
+      '[GoogleYouTubeStrategy] GOOGLE_YOUTUBE_REDIRECT_URI:',
+      redirectUri,
+    );
+    console.log(
+      '[GoogleYouTubeStrategy] Raw env value:',
+      process.env.GOOGLE_YOUTUBE_REDIRECT_URI,
+    );
 
     const clientID = configService.get<string>('GOOGLE_CLIENT_ID') || '';
-    const clientSecret = configService.get<string>('GOOGLE_CLIENT_SECRET') || '';
+    const clientSecret =
+      configService.get<string>('GOOGLE_CLIENT_SECRET') || '';
 
     if (!clientID || !clientSecret) {
       throw new Error(
         'GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET devem estar configurados no .env',
+      );
+    }
+
+    if (!redirectUri) {
+      throw new Error(
+        'GOOGLE_YOUTUBE_REDIRECT_URI deve estar configurado no .env',
       );
     }
 
@@ -60,7 +74,7 @@ export class GoogleYouTubeStrategy extends PassportStrategy(
         const stateData = JSON.parse(
           Buffer.from(req.query.state as string, 'base64').toString(),
         );
-        
+
         if (stateData.userId) {
           userId = stateData.userId;
         }
@@ -88,9 +102,7 @@ export class GoogleYouTubeStrategy extends PassportStrategy(
     const user = await this.userService.findUserByID(userId);
 
     const encryptedAccessToken = encrypt(accessToken);
-    const encryptedRefreshToken = refreshToken
-      ? encrypt(refreshToken)
-      : null;
+    const encryptedRefreshToken = refreshToken ? encrypt(refreshToken) : null;
 
     await this.userService.updateGoogleTokens(
       userId,
@@ -107,4 +119,3 @@ export class GoogleYouTubeStrategy extends PassportStrategy(
     return user;
   }
 }
-
