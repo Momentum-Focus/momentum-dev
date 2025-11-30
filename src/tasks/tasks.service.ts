@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateTaskDTO } from './dtos/createTask.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Task, Prisma, LogActionType } from '@prisma/client';
@@ -112,6 +109,13 @@ export class TasksService {
             },
           },
         },
+        project: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
       },
       orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
     });
@@ -121,9 +125,20 @@ export class TasksService {
     }
 
     return tasks.map((task) => {
-      const { createdAt, updatedAt, deletedAt, tags, ...dataTask } = task;
+      const { createdAt, updatedAt, deletedAt, tags, project, ...dataTask } =
+        task;
       const formattedTags = tags.map((tagTask: any) => tagTask.tag);
-      return { ...dataTask, tags: formattedTags };
+      return {
+        ...dataTask,
+        tags: formattedTags,
+        project: project
+          ? {
+              id: project.id,
+              name: project.name,
+              color: project.color,
+            }
+          : null,
+      };
     });
   }
 
@@ -152,9 +167,14 @@ export class TasksService {
       );
     }
 
-    const { createdAt, updatedAt, deletedAt, tags, ...dataTask } = task;
+    const { deletedAt, tags, ...dataTask } = task;
     const formattedTags = tags.map((tagTask: any) => tagTask.tag);
-    return { ...dataTask, tags: formattedTags };
+    return {
+      ...dataTask,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      tags: formattedTags,
+    };
   }
 
   async deleteTask(id: number, userId: number): Promise<{ message: string }> {

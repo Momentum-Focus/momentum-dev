@@ -463,30 +463,4 @@ export class UserService {
 
     return dataUserUpdated as User;
   }
-
-  async updateYouTubePlaylists(
-    userId: number,
-    savedPlaylists?: string[],
-    hiddenPlaylists?: string[],
-  ): Promise<User> {
-    await this.findUserByID(userId);
-
-    const updateData: any = {};
-    if (savedPlaylists !== undefined) {
-      updateData.youtubeSavedPlaylists = savedPlaylists;
-    }
-    if (hiddenPlaylists !== undefined) {
-      updateData.youtubeHiddenPlaylists = hiddenPlaylists;
-    }
-
-    const updatedUser = await this.prisma.user.update({
-      where: { id: userId },
-      data: updateData,
-    });
-
-    const { password, createdAt, updatedAt, deletedAt, ...dataUserUpdated } =
-      updatedUser;
-
-    return dataUserUpdated as User;
-  }
 }
