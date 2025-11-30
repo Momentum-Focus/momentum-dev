@@ -4,6 +4,7 @@ import {
   Get,
   Delete,
   Param,
+  Body,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -14,12 +15,16 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/auth/strategy/jwt-auth.guard';
 import { UploadService } from './upload.service';
+import { FocusSoundsService } from './focus-sounds.service';
 import type { Request as ExpressRequest } from 'express';
 
 @Controller('media')
 @UseGuards(JwtAuthGuard)
 export class UploadController {
-  constructor(private readonly uploadService: UploadService) {}
+  constructor(
+    private readonly uploadService: UploadService,
+    private readonly focusSoundsService: FocusSoundsService,
+  ) {}
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
@@ -64,5 +69,35 @@ export class UploadController {
 
     await this.uploadService.deleteMedia(mediaId, userId);
     return { message: 'Mídia excluída com sucesso' };
+  }
+
+  @Post('focus-sounds/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadFocusSound(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('soundType') soundType: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Arquivo não fornecido');
+    }
+
+    if (
+      !soundType ||
+      !['rain', 'ocean', 'fireplace', 'lofi'].includes(soundType)
+    ) {
+      throw new BadRequestException(
+        'Tipo de som inválido. Use: rain, ocean, fireplace ou lofi',
+      );
+    }
+
+    return await this.focusSoundsService.uploadFocusSound(
+      file,
+      soundType as 'rain' | 'ocean' | 'fireplace' | 'lofi',
+    );
+  }
+
+  @Get('focus-sounds/urls')
+  async getFocusSoundUrls() {
+    return await this.focusSoundsService.getFocusSoundUrls();
   }
 }

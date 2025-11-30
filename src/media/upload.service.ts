@@ -39,10 +39,11 @@ export class UploadService {
     // Determinar tipo de mídia baseado no mimetype
     const isVideo = file.mimetype.startsWith('video/');
     const isImage = file.mimetype.startsWith('image/');
+    const isAudio = file.mimetype.startsWith('audio/');
 
-    if (!isVideo && !isImage) {
+    if (!isVideo && !isImage && !isAudio) {
       throw new BadRequestException(
-        'Tipo de arquivo não suportado. Apenas imagens e vídeos são permitidos.',
+        'Tipo de arquivo não suportado. Apenas imagens, vídeos e áudios são permitidos.',
       );
     }
 
@@ -116,6 +117,8 @@ export class UploadService {
     }
 
     // Salvar no banco de dados
+    // Nota: Áudios são tratados como IMAGE no banco por enquanto
+    // (o enum MediaType só tem IMAGE e VIDEO)
     const mediaType: MediaType = isVideo ? MediaType.VIDEO : MediaType.IMAGE;
 
     const savedMedia = await this.prisma.media.create({
