@@ -23,11 +23,13 @@ import { YouTubeService } from './youtube.service';
 import { JwtAuthGuard } from 'src/auth/strategy/jwt-auth.guard';
 import { UserService } from 'src/user/user.service';
 import { LogsService } from 'src/logs/logs.service';
-import { LogActionType } from '@prisma/client';
+import { LogActionType, MediaProvider } from '@prisma/client';
 import { encrypt } from './helpers/encryption.helper';
 import * as jwt from 'jsonwebtoken';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PlanService } from 'src/plan/plan.service';
+import { RequireFeatures } from 'src/auth/decorators/feature.decorator';
+import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
 
 @Controller('media')
 export class MediaController {
@@ -1352,25 +1354,24 @@ export class MediaController {
           }
         }
 
-        // Filtra playlists ocultadas se não incluir hidden
-        const user = await this.mediaService.getUserWithTokens(req.user.id);
-        const hiddenPlaylists = Array.isArray(user.youtubeHiddenPlaylists)
-          ? (user.youtubeHiddenPlaylists as string[])
-          : [];
+        // Busca TODAS as playlists salvas/ocultadas do banco (incluindo ocultas para filtrar)
+        const savedPlaylists = await this.mediaService.getSavedPlaylists(
+          req.user.id,
+          MediaProvider.YOUTUBE,
+          true, // Sempre buscar todas para poder filtrar depois
+        );
 
-        let filteredPlaylists = playlists;
-        if (!includeHidden && hiddenPlaylists.length > 0) {
-          filteredPlaylists = playlists.filter(
-            (p) => !hiddenPlaylists.includes(p.id),
-          );
-        }
+        // Lista de IDs de playlists ocultas - NUNCA retornar essas
+        const hiddenPlaylistIds = savedPlaylists
+          .filter((p) => p.isHidden)
+          .map((p) => p.externalId);
 
-        // Adiciona playlists importadas que não estão na lista
-        const savedPlaylists = Array.isArray(user.youtubeSavedPlaylists)
-          ? (user.youtubeSavedPlaylists as string[])
-          : [];
+        // Filtra playlists ocultadas - SEMPRE remover, independente de includeHidden
+        const filteredPlaylists = playlists.filter(
+          (p) => !hiddenPlaylistIds.includes(p.id),
+        );
 
-        // Busca informações das playlists importadas que não estão na lista
+        // Adiciona playlists importadas que não estão na lista da API
         const importedPlaylists: Array<{
           id: string;
           title: string;
@@ -1378,14 +1379,28 @@ export class MediaController {
           thumbnail: string;
           itemCount: number;
         }> = [];
-        for (const savedId of savedPlaylists) {
-          if (!playlists.find((p) => p.id === savedId)) {
+
+        for (const saved of savedPlaylists.filter((p) => !p.isHidden)) {
+          if (!playlists.find((p) => p.id === saved.externalId)) {
             try {
               const playlistInfo = await this.youtubeService.getPlaylistInfo(
-                savedId,
+                saved.externalId,
                 accessToken,
               );
-              // Converte para o formato esperado
+              // Atualiza cache se necessário
+              if (
+                playlistInfo.title !== saved.title ||
+                playlistInfo.thumbnail !== saved.thumbnailUrl
+              ) {
+                await this.mediaService.savePlaylist(
+                  req.user.id,
+                  saved.externalId,
+                  MediaProvider.YOUTUBE,
+                  playlistInfo.title,
+                  playlistInfo.thumbnail,
+                  false,
+                );
+              }
               importedPlaylists.push({
                 id: playlistInfo.id,
                 title: playlistInfo.title,
@@ -1725,7 +1740,7 @@ export class MediaController {
     }
 
     // Extrai o ID da playlist da URL
-    const playlistId = this.extractPlaylistIdFromUrl(url);
+    const playlistId = this.extractPlaylistIdFromUrl(url, 'youtube');
     if (!playlistId) {
       throw new BadRequestException('URL de playlist inválida');
     }
@@ -1811,17 +1826,78 @@ export class MediaController {
         accessToken,
       );
 
-      // Adiciona à lista de playlists salvas do usuário
-      const savedPlaylists = Array.isArray(user.youtubeSavedPlaylists)
-        ? (user.youtubeSavedPlaylists as string[])
-        : [];
-      if (!savedPlaylists.includes(playlistId)) {
-        savedPlaylists.push(playlistId);
-        await this.userService.updateYouTubePlaylists(
-          req.user.id,
-          savedPlaylists,
+      // Salva na nova tabela SavedPlaylist
+      await this.mediaService.savePlaylist(
+        req.user.id,
+        playlistId,
+        MediaProvider.YOUTUBE,
+        playlistInfo.title,
+        playlistInfo.thumbnail,
+        false,
+      );
+
+      return {
+        message: 'Playlist importada com sucesso',
+        playlist: playlistInfo,
+      };
+    } catch (error: any) {
+      throw new BadRequestException(
+        `Erro ao importar playlist: ${error.message}`,
+      );
+    }
+  }
+
+  @Post('youtube/playlist/import')
+  @UseGuards(JwtAuthGuard)
+  async importYouTubePlaylistByUrl(
+    @Request() req: any,
+    @Body() body: { url: string },
+  ) {
+    if (!body.url) {
+      throw new BadRequestException('URL da playlist é obrigatória');
+    }
+
+    const playlistId = this.extractPlaylistIdFromUrl(body.url, 'youtube');
+    if (!playlistId) {
+      throw new BadRequestException('URL da playlist inválida');
+    }
+
+    const user = await this.mediaService.getUserWithTokens(req.user.id);
+    if (!user.isGoogleConnected || !user.googleAccessToken) {
+      throw new BadRequestException('YouTube Music não está conectado');
+    }
+
+    let accessToken: string;
+    try {
+      accessToken = await this.youtubeService.getUserAccessToken(
+        user.googleAccessToken,
+      );
+    } catch (decryptError: any) {
+      const newToken = await this.mediaService.refreshGoogleToken(req.user.id);
+      if (newToken) {
+        accessToken = newToken;
+      } else {
+        throw new BadRequestException(
+          'Erro ao acessar token do YouTube. Reconecte sua conta.',
         );
       }
+    }
+
+    try {
+      const playlistInfo = await this.youtubeService.getPlaylistInfo(
+        playlistId,
+        accessToken,
+      );
+
+      // Salva na nova tabela SavedPlaylist
+      await this.mediaService.savePlaylist(
+        req.user.id,
+        playlistId,
+        MediaProvider.YOUTUBE,
+        playlistInfo.title,
+        playlistInfo.thumbnail,
+        false,
+      );
 
       return {
         message: 'Playlist importada com sucesso',
@@ -1836,40 +1912,142 @@ export class MediaController {
 
   @Post('youtube/playlist/:playlistId/hide')
   @UseGuards(JwtAuthGuard)
-  async hidePlaylist(@Request() req: any) {
+  async hideYouTubePlaylist(@Request() req: any) {
     const playlistId = req.params.playlistId;
-    const user = await this.mediaService.getUserWithTokens(req.user.id);
 
-    const hiddenPlaylists = Array.isArray(user.youtubeHiddenPlaylists)
-      ? (user.youtubeHiddenPlaylists as string[])
-      : [];
-    if (!hiddenPlaylists.includes(playlistId)) {
-      hiddenPlaylists.push(playlistId);
-      await this.userService.updateYouTubePlaylists(
-        req.user.id,
-        undefined,
-        hiddenPlaylists,
-      );
-    }
+    await this.mediaService.togglePlaylistVisibility(
+      req.user.id,
+      playlistId,
+      MediaProvider.YOUTUBE,
+      true,
+    );
 
     return { message: 'Playlist ocultada com sucesso' };
   }
 
-  private extractPlaylistIdFromUrl(url: string): string | null {
-    const patterns = [
-      /[?&]list=([a-zA-Z0-9_-]+)/,
-      /youtube\.com\/playlist\?list=([a-zA-Z0-9_-]+)/,
-      /youtu\.be\/.*[?&]list=([a-zA-Z0-9_-]+)/,
-    ];
+  @Post('spotify/playlist/:playlistId/hide')
+  @UseGuards(JwtAuthGuard)
+  async hideSpotifyPlaylist(@Request() req: any) {
+    const playlistId = req.params.playlistId;
 
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match && match[1]) {
-        return match[1];
+    await this.mediaService.togglePlaylistVisibility(
+      req.user.id,
+      playlistId,
+      MediaProvider.SPOTIFY,
+      true,
+    );
+
+    return { message: 'Playlist ocultada com sucesso' };
+  }
+
+  private extractPlaylistIdFromUrl(
+    url: string,
+    provider: 'youtube' | 'spotify',
+  ): string | null {
+    if (provider === 'youtube') {
+      const patterns = [
+        /[?&]list=([a-zA-Z0-9_-]+)/,
+        /youtube\.com\/playlist\?list=([a-zA-Z0-9_-]+)/,
+        /youtu\.be\/.*[?&]list=([a-zA-Z0-9_-]+)/,
+      ];
+
+      for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match && match[1]) {
+          return match[1];
+        }
+      }
+    } else if (provider === 'spotify') {
+      // Spotify: spotify:playlist:ID ou https://open.spotify.com/playlist/ID
+      const spotifyPatterns = [
+        /spotify:playlist:([a-zA-Z0-9]+)/,
+        /open\.spotify\.com\/playlist\/([a-zA-Z0-9]+)/,
+        /spotify\.com\/playlist\/([a-zA-Z0-9]+)/,
+      ];
+
+      for (const pattern of spotifyPatterns) {
+        const match = url.match(pattern);
+        if (match && match[1]) {
+          return match[1];
+        }
       }
     }
 
     return null;
+  }
+
+  @Post('spotify/playlist/import')
+  @UseGuards(JwtAuthGuard)
+  async importSpotifyPlaylistByUrl(
+    @Request() req: any,
+    @Body() body: { url: string },
+  ) {
+    if (!body.url) {
+      throw new BadRequestException('URL da playlist é obrigatória');
+    }
+
+    const playlistId = this.extractPlaylistIdFromUrl(body.url, 'spotify');
+    if (!playlistId) {
+      throw new BadRequestException('URL da playlist inválida');
+    }
+
+    const user = await this.mediaService.getUserWithTokens(req.user.id);
+    if (!user.isSpotifyConnected || !user.spotifyAccessToken) {
+      throw new BadRequestException('Spotify não está conectado');
+    }
+
+    let accessToken = await this.mediaService.getSpotifyAccessToken(
+      req.user.id,
+    );
+    if (!accessToken) {
+      throw new BadRequestException(
+        'Erro ao acessar token do Spotify. Reconecte sua conta.',
+      );
+    }
+
+    try {
+      // Busca informações da playlist
+      const response = await fetch(
+        `https://api.spotify.com/v1/playlists/${playlistId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error('Playlist não encontrada ou sem permissão');
+      }
+
+      const playlistData = await response.json();
+
+      // Salva na nova tabela SavedPlaylist
+      await this.mediaService.savePlaylist(
+        req.user.id,
+        playlistId,
+        MediaProvider.SPOTIFY,
+        playlistData.name,
+        playlistData.images?.[0]?.url || null,
+        false,
+      );
+
+      return {
+        message: 'Playlist importada com sucesso',
+        playlist: {
+          id: playlistData.id,
+          name: playlistData.name,
+          description: playlistData.description,
+          image: playlistData.images?.[0]?.url || null,
+          tracksCount: playlistData.tracks?.total || 0,
+        },
+      };
+    } catch (error: any) {
+      throw new BadRequestException(
+        `Erro ao importar playlist: ${error.message}`,
+      );
+    }
   }
 
   @Post('youtube/play')
@@ -2029,6 +2207,7 @@ export class MediaController {
       throw new BadRequestException('Arquivo é obrigatório.');
     }
 
+    // Verificação de feature apenas para vídeos
     const isVideo = file.mimetype.startsWith('video/');
     if (isVideo) {
       const hasFeature = await this.planService.userHasFeature(

@@ -4,7 +4,7 @@ import { UserService } from 'src/user/user.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { decrypt, encrypt } from './helpers/encryption.helper';
 import { LogsService } from 'src/logs/logs.service';
-import { LogActionType } from '@prisma/client';
+import { LogActionType, MediaProvider } from '@prisma/client';
 import type { Express } from 'express';
 
 @Injectable()
@@ -503,15 +503,47 @@ export class MediaService {
         return [];
       }
 
-      return data.items.map((playlist: any) => ({
-        id: playlist.id,
-        name: playlist.name,
-        description: playlist.description,
-        image: playlist.images[0]?.url || null,
-        tracksCount: playlist.tracks.total,
-        owner: playlist.owner.display_name,
-        uri: playlist.uri,
-      }));
+      // Busca TODAS as playlists salvas/ocultadas do banco (incluindo ocultas para filtrar)
+      const savedPlaylists = await this.getSavedPlaylists(
+        userId,
+        MediaProvider.SPOTIFY,
+        true, // includeHidden: true para poder filtrar depois
+      );
+
+      // Lista de IDs de playlists ocultas - NUNCA retornar essas
+      const hiddenPlaylistIds = savedPlaylists
+        .filter((p) => p.isHidden)
+        .map((p) => p.externalId);
+
+      // Mapeia playlists da API e FILTRA as ocultas
+      const playlists = data.items
+        .map((playlist: any) => ({
+          id: playlist.id,
+          name: playlist.name,
+          description: playlist.description,
+          image: playlist.images[0]?.url || null,
+          tracksCount: playlist.tracks.total,
+          owner: playlist.owner.display_name,
+          uri: playlist.uri,
+        }))
+        .filter((playlist: any) => !hiddenPlaylistIds.includes(playlist.id)); // CRÍTICO: Remove ocultas
+
+      // Adiciona playlists importadas que não estão na lista da API (apenas as NÃO ocultas)
+      const importedPlaylists = savedPlaylists
+        .filter(
+          (p) => !p.isHidden && !playlists.find((pl) => pl.id === p.externalId),
+        )
+        .map((p) => ({
+          id: p.externalId,
+          name: p.title || 'Playlist Importada',
+          description: null,
+          image: p.thumbnailUrl || null,
+          tracksCount: 0,
+          owner: 'Importada',
+          uri: `spotify:playlist:${p.externalId}`,
+        }));
+
+      return [...playlists, ...importedPlaylists];
     } catch (error: any) {
       throw error;
     }
@@ -836,13 +868,27 @@ export class MediaService {
       throw new Error('Playlist não encontrada ou inválida');
     }
 
-    const uri = `spotify:playlist:${playlistId}`;
-
-    await this.userService.findUserByID(userId);
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { spotifyFocusPlaylistUri: uri },
+    // Remove isFocus de todas as playlists anteriores do usuário
+    await this.prisma.savedPlaylist.updateMany({
+      where: {
+        userId,
+        provider: MediaProvider.SPOTIFY,
+        isFocus: true,
+        deletedAt: null,
+      },
+      data: { isFocus: false },
     });
+
+    // Cria ou atualiza a playlist com isFocus: true
+    await this.savePlaylist(
+      userId,
+      playlistId,
+      MediaProvider.SPOTIFY,
+      playlistInfo.name,
+      playlistInfo.image || undefined,
+      false, // isHidden
+      true, // isFocus
+    );
 
     await this.logsService.createLog(
       userId,
@@ -856,9 +902,16 @@ export class MediaService {
    */
   async removeFocusPlaylist(userId: number): Promise<void> {
     await this.userService.findUserByID(userId);
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { spotifyFocusPlaylistUri: null },
+
+    // Remove isFocus de todas as playlists do usuário
+    await this.prisma.savedPlaylist.updateMany({
+      where: {
+        userId,
+        provider: MediaProvider.SPOTIFY,
+        isFocus: true,
+        deletedAt: null,
+      },
+      data: { isFocus: false },
     });
 
     await this.logsService.createLog(
@@ -977,5 +1030,81 @@ export class MediaService {
       size: file.size,
       isVideo,
     };
+  }
+
+  /**
+   * Salva ou atualiza uma playlist na tabela SavedPlaylist
+   */
+  async savePlaylist(
+    userId: number,
+    externalId: string,
+    provider: MediaProvider,
+    title?: string,
+    thumbnailUrl?: string,
+    isHidden: boolean = false,
+    isFocus: boolean = false,
+  ) {
+    return await this.prisma.savedPlaylist.upsert({
+      where: {
+        userId_externalId_provider: {
+          userId,
+          externalId,
+          provider,
+        },
+      },
+      update: {
+        title,
+        thumbnailUrl,
+        isHidden,
+        isFocus,
+        updatedAt: new Date(),
+      },
+      create: {
+        userId,
+        externalId,
+        provider,
+        title,
+        thumbnailUrl,
+        isHidden,
+        isFocus,
+      },
+    });
+  }
+
+  /**
+   * Marca uma playlist como oculta ou visível
+   */
+  async togglePlaylistVisibility(
+    userId: number,
+    externalId: string,
+    provider: MediaProvider,
+    isHidden: boolean,
+  ) {
+    return await this.savePlaylist(
+      userId,
+      externalId,
+      provider,
+      undefined,
+      undefined,
+      isHidden,
+    );
+  }
+
+  /**
+   * Busca playlists salvas do usuário por provider
+   */
+  async getSavedPlaylists(
+    userId: number,
+    provider: MediaProvider,
+    includeHidden: boolean = false,
+  ) {
+    return await this.prisma.savedPlaylist.findMany({
+      where: {
+        userId,
+        provider,
+        deletedAt: null,
+        ...(includeHidden ? {} : { isHidden: false }),
+      },
+    });
   }
 }
