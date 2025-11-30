@@ -13,8 +13,9 @@ import { UserService } from 'src/user/user.service';
 import { RoleService } from 'src/role/role.service';
 import { UserRoleService } from 'src/user-role/user-role.service';
 import { LogsService } from 'src/logs/logs.service';
-import { LogActionType, AuthMethod } from '@prisma/client';
+import { LogActionType, AuthMethod, SubscriptionStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { PlanService } from 'src/plan/plan.service';
 
 @Injectable()
 export class AuthService {
@@ -25,6 +26,7 @@ export class AuthService {
     private roleService: RoleService,
     private userRoleService: UserRoleService,
     private logsService: LogsService,
+    private planService: PlanService,
   ) {}
 
   async validateUser(email: string, pass: string): Promise<any> {
@@ -70,6 +72,17 @@ export class AuthService {
 
     const roleId = await this.roleService.findRole('USER');
 
+    // Busca o plano "VIBES" (Free) para auto-subscribe
+    const vibesPlan = await this.prisma.plan.findFirst({
+      where: { name: 'VIBES', isActive: true, deletedAt: null },
+    });
+
+    if (!vibesPlan) {
+      throw new InternalServerErrorException(
+        'Plano padrão (VIBES) não encontrado. Execute o seed do banco de dados.',
+      );
+    }
+
     const result = await this.prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
@@ -87,6 +100,16 @@ export class AuthService {
         data: {
           userId: newUser.id,
           roleId: roleId,
+        },
+      });
+
+      // Auto-subscribe: Cria subscription ativa para o plano VIBES
+      await tx.subscription.create({
+        data: {
+          userId: newUser.id,
+          planId: vibesPlan.id,
+          status: SubscriptionStatus.ACTIVE,
+          startDate: new Date(),
         },
       });
 
@@ -197,13 +220,8 @@ export class AuthService {
         'Google Login',
       );
 
-      const {
-        password,
-        createdAt,
-        updatedAt,
-        deletedAt,
-        ...userData
-      } = existingUserByGoogleId;
+      const { password, createdAt, updatedAt, deletedAt, ...userData } =
+        existingUserByGoogleId;
 
       const payload = { sub: userData.id, email: userData.email };
       const access_token = await this.jwtService.signAsync(payload);
@@ -250,6 +268,17 @@ export class AuthService {
 
     const roleId = await this.roleService.findRole('USER');
 
+    // Busca o plano "VIBES" (Free) para auto-subscribe
+    const vibesPlan = await this.prisma.plan.findFirst({
+      where: { name: 'VIBES', isActive: true, deletedAt: null },
+    });
+
+    if (!vibesPlan) {
+      throw new InternalServerErrorException(
+        'Plano padrão (VIBES) não encontrado. Execute o seed do banco de dados.',
+      );
+    }
+
     const result = await this.prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
@@ -268,6 +297,16 @@ export class AuthService {
         data: {
           userId: newUser.id,
           roleId: roleId,
+        },
+      });
+
+      // Auto-subscribe: Cria subscription ativa para o plano VIBES
+      await tx.subscription.create({
+        data: {
+          userId: newUser.id,
+          planId: vibesPlan.id,
+          status: SubscriptionStatus.ACTIVE,
+          startDate: new Date(),
         },
       });
 

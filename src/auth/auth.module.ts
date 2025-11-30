@@ -11,12 +11,14 @@ import { JwtAuthGuard } from './strategy/jwt-auth.guard';
 import { JwtStrategy } from './strategy/jwt.strategy';
 import { LocalStrategy } from './strategy/localStrategy';
 import { GoogleLoginStrategy } from './strategy/google-login.strategy';
+import { PlanModule } from 'src/plan/plan.module';
 
 @Module({
   imports: [
     UserModule,
     RoleModule,
     UserRoleModule,
+    PlanModule,
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET,
