@@ -30,28 +30,20 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('Usuário não autenticado.');
     }
 
-    const subscription = await this.planService.getUserSubscription(userId);
-    if (!subscription?.plan) {
-      throw new ForbiddenException('Faça upgrade para acessar este recurso.');
-    }
-
-    const featureCodes = subscription.plan.features.map(
-      (planFeature) => planFeature.feature.code,
-    );
-
-    const missingFeature = requiredFeatures.find(
-      (feature) => !featureCodes.includes(feature),
-    );
-
-    if (missingFeature) {
-      throw new ForbiddenException(
-        'Faça upgrade para o Momentum Pro e desbloqueie este recurso.',
+    // Verifica cada feature requerida usando método otimizado
+    for (const featureCode of requiredFeatures) {
+      const hasFeature = await this.planService.userHasFeature(
+        userId,
+        featureCode,
       );
+
+      if (!hasFeature) {
+        throw new ForbiddenException(
+          `Esta funcionalidade requer o plano que inclui: ${featureCode}. Faça upgrade para desbloquear.`,
+        );
+      }
     }
 
-    request.userFeatures = featureCodes;
     return true;
   }
 }
-
-

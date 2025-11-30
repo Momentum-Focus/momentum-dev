@@ -104,9 +104,21 @@ async function main() {
       description: 'Visualize seu tempo focado e histórico de sessões.',
     },
     {
+      code: 'SESSION_HISTORY',
+      name: 'Histórico de Sessões',
+      description:
+        'Acesse um histórico detalhado de todas as suas sessões de estudo.',
+    },
+    {
       code: 'ADVANCED_REPORTS',
       name: 'Relatórios Avançados',
       description: 'Insights detalhados e análises avançadas de produtividade.',
+    },
+    {
+      code: 'ADVANCED_INSIGHTS',
+      name: 'Insights Avançados',
+      description:
+        'Análises inteligentes e recomendações personalizadas de produtividade.',
     },
     {
       code: 'FULL_CUSTOMIZATION',
@@ -153,7 +165,12 @@ async function main() {
         'Tudo do Vibes + fundos em vídeo, projetos e relatórios básicos.',
       price: new Prisma.Decimal('19.90'),
       billingCycle: BillingCycle.MONTHLY,
-      featureCodes: ['VIDEO_BACKGROUND', 'PROJECTS', 'BASIC_REPORTS'],
+      featureCodes: [
+        'VIDEO_BACKGROUND',
+        'PROJECTS',
+        'BASIC_REPORTS',
+        'SESSION_HISTORY',
+      ],
     },
     {
       name: 'EPIC',
@@ -165,7 +182,9 @@ async function main() {
         'VIDEO_BACKGROUND',
         'PROJECTS',
         'BASIC_REPORTS',
+        'SESSION_HISTORY',
         'ADVANCED_REPORTS',
+        'ADVANCED_INSIGHTS',
         'FULL_CUSTOMIZATION',
         'EXTRA_INTEGRATIONS',
         'PRIORITY_SUPPORT',

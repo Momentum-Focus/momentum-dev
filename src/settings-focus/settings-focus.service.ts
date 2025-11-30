@@ -27,7 +27,7 @@ export class SettingsFocusService {
     });
   }
 
-  async saveSettings(userId: number, dto: CreateSettingsFocusDTO) {
+  async saveSettings(userId: number, dto: Partial<CreateSettingsFocusDTO>) {
     const settings = await this.prisma.settingsFocus.upsert({
       where: { userId },
       update: {

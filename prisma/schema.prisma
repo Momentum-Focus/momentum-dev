@@ -23,7 +23,6 @@ model User {
   name                String
   email               String            @unique
   phone               String?           @unique
-  cpf                 String?           @unique
   password            String?
   emailVerified       Boolean           @default(false)
   createdAt           DateTime          @default(now())
@@ -32,29 +31,28 @@ model User {
   isSpotifyConnected  Boolean           @default(false)
   spotifyAccessToken  String?
   spotifyRefreshToken String?
-  spotifyFocusPlaylistUri String?
-  spotifyProduct      String?           // 'premium', 'free', ou 'open'
   authMethod          AuthMethod        @default(EMAIL)
   googleAccessToken   String?
   googleId            String?           @unique
   googleRefreshToken  String?
   isGoogleConnected   Boolean           @default(false)
-  youtubeSavedPlaylists Json            @default("[]") // IDs de playlists importadas
-  youtubeHiddenPlaylists Json           @default("[]") // IDs de playlists ocultadas
+  cpf                 String?           @unique
+  spotifyProduct      String?
+  comments            Comment[]
   dailyLogs           DailyLog[]
   logs                LogActivity[]
   media               Media[]
   notifications       Notification[]
   projects            Project[]
   reports             Report[]
+  savedPlaylists      SavedPlaylist[]
   settings            SettingsFocus?
   studySessions       StudySession[]
   subscriptions       Subscription?
-  tasks               Task[]
-  roles               UserRole[]
   tags                Tag[]
-  comments            Comment[]
+  tasks               Task[]
   achievements        UserAchievement[]
+  roles               UserRole[]
 }
 
 model Media {
@@ -76,6 +74,7 @@ model SettingsFocus {
   shortBreakDurationMinutes Int       @default(5)
   longBreakDurationMinutes  Int       @default(15)
   cyclesBeforeLongBreak     Int       @default(4)
+  themeColor                String?   @default("#3B82F6")
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime  @updatedAt
   deletedAt                 DateTime?
@@ -117,15 +116,16 @@ model Task {
   completedAt              DateTime?
   estimatedDurationMinutes Int?
   estimatedSessions        Int?
+  actualDurationMinutes    Int            @default(0)
   createdAt                DateTime       @default(now())
   updatedAt                DateTime       @updatedAt
   deletedAt                DateTime?
   projectId                Int?
+  comments                 Comment[]
   studySessions            StudySession[]
+  tags                     TagTask[]
   project                  Project?       @relation(fields: [projectId], references: [id])
   user                     User           @relation(fields: [userId], references: [id])
-  tags                     TagTask[]
-  comments                 Comment[]
 }
 
 model Project {
@@ -140,9 +140,9 @@ model Project {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   deletedAt   DateTime?
+  comments    Comment[]
   user        User          @relation(fields: [userId], references: [id])
   tasks       Task[]
-  comments    Comment[]
 }
 
 model StudySession {
@@ -165,6 +165,7 @@ model DailyLog {
   userId            Int
   date              DateTime  @db.Date
   totalFocusMinutes Int       @default(0)
+  totalPauseMinutes Int       @default(0)
   tasksCompleted    Int       @default(0)
   completedSessions Int       @default(0)
   createdAt         DateTime  @default(now())
@@ -251,6 +252,84 @@ model Report {
   user        User         @relation(fields: [userId], references: [id])
 }
 
+model Tag {
+  id        Int       @id @default(autoincrement())
+  name      String
+  color     String?
+  userId    Int
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  user      User      @relation(fields: [userId], references: [id])
+  tasks     TagTask[]
+
+  @@unique([userId, name])
+}
+
+model TagTask {
+  id        Int      @id @default(autoincrement())
+  tagId     Int
+  taskId    Int
+  createdAt DateTime @default(now())
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId, taskId])
+}
+
+model Comment {
+  id        Int       @id @default(autoincrement())
+  content   String
+  userId    Int
+  taskId    Int?
+  projectId Int?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  project   Project?  @relation(fields: [projectId], references: [id])
+  task      Task?     @relation(fields: [taskId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+}
+
+model Achievement {
+  id          Int               @id @default(autoincrement())
+  code        AchievementCode   @unique
+  name        String
+  description String
+  iconUrl     String?
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  id            Int         @id @default(autoincrement())
+  earnedAt      DateTime    @default(now())
+  userId        Int
+  achievementId Int
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  user          User        @relation(fields: [userId], references: [id])
+
+  @@unique([userId, achievementId])
+}
+
+model SavedPlaylist {
+  id           Int           @id @default(autoincrement())
+  userId       Int
+  externalId   String
+  provider     MediaProvider
+  title        String?
+  thumbnailUrl String?
+  isHidden     Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+  isFocus      Boolean       @default(false)
+  user         User          @relation(fields: [userId], references: [id])
+
+  @@unique([userId, externalId, provider])
+  @@index([userId, provider, isHidden])
+  @@index([userId, isFocus])
+}
+
 enum AuthMethod {
   EMAIL
   GOOGLE
@@ -301,20 +380,20 @@ enum SubscriptionStatus {
 enum LogActionType {
   USER_REGISTER
   USER_LOGIN
-  USER_LOGIN_SUCCESS
-  USER_LOGIN_FAILED
   USER_PASSWORD_UPDATE
   USER_PROFILE_UPDATE
-  USER_DELETE_ACCOUNT
   TASK_CREATE
   TASK_UPDATE
   TASK_DELETE
   TASK_COMPLETE
+  SETTINGS_UPDATE
+  USER_LOGIN_SUCCESS
+  USER_LOGIN_FAILED
+  USER_DELETE_ACCOUNT
   PROJECT_CREATE
   PROJECT_UPDATE
   PROJECT_DELETE
   PROJECT_COMPLETE
-  SETTINGS_UPDATE
   TAG_CREATE
   TAG_UPDATE
   TAG_DELETE
@@ -323,9 +402,9 @@ enum LogActionType {
   ACHIEVEMENT_EARNED
   MEDIA_CONNECT_SPOTIFY
   MEDIA_CONNECT_GOOGLE
+  GENERIC_ERROR
   MEDIA_DISCONNECT_SPOTIFY
   MEDIA_DISCONNECT_GOOGLE
-  GENERIC_ERROR
 }
 
 enum ReportType {
@@ -333,6 +412,7 @@ enum ReportType {
   FEATURE_REQUEST
   QUESTION
   GENERAL_FEEDBACK
+  PRIORITY
 }
 
 enum ReportStatus {
@@ -340,6 +420,11 @@ enum ReportStatus {
   IN_PROGRESS
   RESOLVED
   CLOSED
+}
+
+enum MediaProvider {
+  SPOTIFY
+  YOUTUBE
 }
 
 enum CommentType {
@@ -357,63 +442,4 @@ enum AchievementCode {
   FIRST_PROJECT_COMPLETED
   FOCUS_10_HOURS
   FOCUS_100_HOURS
-}
-
-model Tag {
-  id        Int       @id @default(autoincrement())
-  name      String
-  color     String?
-  userId    Int
-  user      User      @relation(fields: [userId], references: [id])
-  tasks     TagTask[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  @@unique([userId, name])
-}
-
-model TagTask {
-  id        Int      @id @default(autoincrement())
-  tagId     Int
-  taskId    Int
-  createdAt DateTime @default(now())
-  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-
-  @@unique([tagId, taskId])
-}
-
-model Comment {
-  id        Int       @id @default(autoincrement())
-  content   String    @db.Text
-  userId    Int
-  user      User      @relation(fields: [userId], references: [id])
-  taskId    Int?
-  task      Task?     @relation(fields: [taskId], references: [id])
-  projectId Int?
-  project   Project?  @relation(fields: [projectId], references: [id])
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-}
-
-model Achievement {
-  id          Int               @id @default(autoincrement())
-  code        AchievementCode   @unique
-  name        String
-  description String
-  iconUrl     String?
-  users       UserAchievement[]
-}
-
-model UserAchievement {
-  id            Int         @id @default(autoincrement())
-  earnedAt      DateTime    @default(now())
-  userId        Int
-  user          User        @relation(fields: [userId], references: [id])
-  achievementId Int
-  achievement   Achievement @relation(fields: [achievementId], references: [id])
-
-  @@unique([userId, achievementId])
 }

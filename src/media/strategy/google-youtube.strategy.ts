@@ -57,6 +57,80 @@ export class GoogleYouTubeStrategy extends PassportStrategy(
     });
   }
 
+  authenticate(req: any, options?: any): void {
+    // CRÍTICO: Força sempre mostrar a tela de escolha de conta
+    // Isso garante que o usuário sempre veja a tela de seleção, mesmo se já estiver logado
+    options = options || {};
+
+    // Inicializa authorizationParams se não existir
+    if (!options.authorizationParams) {
+      options.authorizationParams = {};
+    }
+
+    // FORÇA a tela de seleção de conta SEMPRE
+    // prompt: 'select_account' é OBRIGATÓRIO para garantir que o Google mostre a tela de escolha
+    options.authorizationParams.prompt = 'select_account';
+    options.authorizationParams.access_type = 'offline';
+
+    // Parâmetros adicionais para forçar a seleção de conta
+    // include_granted_scopes: false força uma nova autorização
+    options.authorizationParams.include_granted_scopes = false;
+
+    // TENTATIVA ALTERNATIVA: Passar prompt diretamente nas opções também
+    // Algumas versões do passport-google-oauth20 podem não usar authorizationParams
+    options.prompt = 'select_account';
+
+    // Adiciona um parâmetro de estado único para evitar cache do navegador
+    // Isso força o Google a tratar cada requisição como única
+    if (!options.state) {
+      options.state = `state_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    }
+
+    // Intercepta o redirecionamento para garantir que o prompt está na URL
+    const originalRedirect = req.res?.redirect;
+    if (originalRedirect && req.res) {
+      req.res.redirect = (url: string) => {
+        // Verifica se a URL contém o parâmetro prompt
+        const urlObj = new URL(url);
+        if (!urlObj.searchParams.has('prompt')) {
+          // Adiciona o parâmetro prompt=select_account se não estiver presente
+          urlObj.searchParams.set('prompt', 'select_account');
+          console.warn(
+            `[GoogleYouTubeStrategy] ⚠️  prompt não estava na URL, adicionando manualmente`,
+          );
+          console.debug(`[GoogleYouTubeStrategy] URL original: ${url}`);
+          console.debug(
+            `[GoogleYouTubeStrategy] URL modificada: ${urlObj.toString()}`,
+          );
+          return originalRedirect.call(req.res, urlObj.toString());
+        } else {
+          // Verifica se o valor está correto
+          const currentPrompt = urlObj.searchParams.get('prompt');
+          if (currentPrompt !== 'select_account') {
+            urlObj.searchParams.set('prompt', 'select_account');
+            console.warn(
+              `[GoogleYouTubeStrategy] ⚠️  prompt tinha valor '${currentPrompt}', alterando para 'select_account'`,
+            );
+            return originalRedirect.call(req.res, urlObj.toString());
+          }
+        }
+        return originalRedirect.call(req.res, url);
+      };
+    }
+
+    // Log detalhado para debug
+    console.log(
+      `[GoogleYouTubeStrategy] 🔐 Forçando seleção de conta - prompt=select_account, access_type=offline, include_granted_scopes=false`,
+    );
+    console.log(`[GoogleYouTubeStrategy] Options: ${JSON.stringify(options)}`);
+    console.log(
+      `[GoogleYouTubeStrategy] AuthorizationParams: ${JSON.stringify(options.authorizationParams)}`,
+    );
+
+    // Chama o método authenticate da classe pai com as opções configuradas
+    super.authenticate(req, options);
+  }
+
   async validate(
     req: any,
     accessToken: string,

@@ -20,6 +20,8 @@ import { MediaModule } from './media/media.module';
 import { TagsModule } from './tags/tags.module';
 import { CommentsModule } from './comments/comments.module';
 import { AchievementsModule } from './achievements/achievements.module';
+import { SupportModule } from './support/support.module';
+import { TimerModule } from './timer/timer.module';
 
 @Module({
   imports: [
@@ -42,6 +44,8 @@ import { AchievementsModule } from './achievements/achievements.module';
     TagsModule,
     CommentsModule,
     AchievementsModule,
+    SupportModule,
+    TimerModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, Min } from 'class-validator';
+import { IsInt, IsOptional, Min, IsString, Matches } from 'class-validator';
 
 export class CreateSettingsFocusDTO {
   @IsInt()
@@ -20,4 +20,11 @@ export class CreateSettingsFocusDTO {
   @Min(1)
   @IsOptional()
   cyclesBeforeLongBreak?: number;
+
+  @IsString()
+  @Matches(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, {
+    message: 'themeColor must be a valid hex color',
+  })
+  @IsOptional()
+  themeColor?: string;
 }

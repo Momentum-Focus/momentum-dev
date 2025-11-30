@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -21,25 +22,43 @@ export class ProjectService {
   ) {}
 
   async create(createProjectDto: CreateProjectDTO, userId: number) {
-    const [projectCount, hasUnlimitedProjects] = await Promise.all([
+    const [projectCount, hasProjectsFeature] = await Promise.all([
       this.prisma.project.count({
         where: {
           userId,
           deletedAt: null,
         },
       }),
-      this.planService.userHasFeature(userId, 'UNLIMITED_PROJECTS'),
+      this.planService.userHasFeature(userId, 'PROJECTS'),
     ]);
 
-    if (!hasUnlimitedProjects && projectCount >= 3) {
+    // Se o usuário tem a feature PROJECTS (Flow ou Epic), não há limite
+    // Se não tem (Vibes), limite de 3 projetos
+    if (!hasProjectsFeature && projectCount >= 3) {
       throw new ForbiddenException(
-        'Alcance do plano Free atingido. Faça upgrade para criar mais projetos.',
+        'Alcance do plano Vibes atingido. Faça upgrade para Flow ou Epic para criar projetos ilimitados.',
       );
     }
 
+    // Converte dueDate de string para Date se fornecido
+    const dueDate = createProjectDto.dueDate
+      ? new Date(createProjectDto.dueDate)
+      : null;
+
+    // Valida se a data é válida
+    if (dueDate && isNaN(dueDate.getTime())) {
+      throw new BadRequestException('Data de vencimento inválida.');
+    }
+
+    // Define cor padrão como azul se não fornecida
+    const color = createProjectDto.color || '#3B82F6';
+
     const project = await this.prisma.project.create({
       data: {
-        ...createProjectDto,
+        name: createProjectDto.name,
+        description: createProjectDto.description || null,
+        color: color,
+        dueDate: dueDate,
         userId: userId,
       },
     });
@@ -54,14 +73,39 @@ export class ProjectService {
   }
 
   async findAll(userId: number) {
-    return this.prisma.project.findMany({
+    const projects = await this.prisma.project.findMany({
       where: {
         userId: userId,
         deletedAt: null,
       },
-      orderBy: {
-        createdAt: 'desc',
+      include: {
+        tasks: {
+          where: {
+            deletedAt: null,
+          },
+        },
       },
+      orderBy: {
+        createdAt: 'asc', // Mais antigos primeiro
+      },
+    });
+
+    // Calcula o progresso de cada projeto baseado nas tasks completadas
+    return projects.map((project) => {
+      const totalTasks = project.tasks.length;
+      const completedTasks = project.tasks.filter(
+        (task) => task.isCompleted,
+      ).length;
+      const progress =
+        totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+      const { tasks, ...projectData } = project;
+      return {
+        ...projectData,
+        progress,
+        totalTasks,
+        completedTasks,
+      };
     });
   }
 
@@ -72,6 +116,27 @@ export class ProjectService {
         userId: userId,
         deletedAt: null,
       },
+      include: {
+        tasks: {
+          where: {
+            deletedAt: null,
+          },
+          include: {
+            tags: {
+              include: {
+                tag: {
+                  select: {
+                    id: true,
+                    name: true,
+                    color: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+        },
+      },
     });
 
     if (!project) {
@@ -79,17 +144,59 @@ export class ProjectService {
         'Projeto não encontrado ou você não tem permissão para acessá-lo.',
       );
     }
-    return project;
+
+    // Formata as tasks para incluir tags formatadas
+    const formattedTasks = project.tasks.map((task) => {
+      const { tags, ...taskData } = task;
+      const formattedTags = tags.map((tagTask: any) => tagTask.tag);
+      return { ...taskData, tags: formattedTags };
+    });
+
+    return {
+      ...project,
+      tasks: formattedTasks,
+    };
   }
 
   async update(id: number, updateProjectDto: UpdateProjectDTO, userId: number) {
     await this.findOne(id, userId);
 
+    // Prepara os dados para atualização
+    const updateData: any = {};
+
+    if (updateProjectDto.name !== undefined) {
+      updateData.name = updateProjectDto.name;
+    }
+
+    if (updateProjectDto.description !== undefined) {
+      updateData.description = updateProjectDto.description || null;
+    }
+
+    if (updateProjectDto.color !== undefined) {
+      updateData.color = updateProjectDto.color || '#3B82F6';
+    }
+
+    if (updateProjectDto.dueDate !== undefined) {
+      if (updateProjectDto.dueDate) {
+        const dueDate = new Date(updateProjectDto.dueDate);
+        if (isNaN(dueDate.getTime())) {
+          throw new BadRequestException('Data de vencimento inválida.');
+        }
+        updateData.dueDate = dueDate;
+      } else {
+        updateData.dueDate = null;
+      }
+    }
+
+    if (updateProjectDto.status !== undefined) {
+      updateData.status = updateProjectDto.status;
+    }
+
     const project = await this.prisma.project.update({
       where: {
         id: id,
       },
-      data: updateProjectDto,
+      data: updateData,
     });
 
     if (updateProjectDto.status === 'COMPLETED' && !project.completedAt) {
