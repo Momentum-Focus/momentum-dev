@@ -12,8 +12,11 @@ import {
 } from '@nestjs/common';
 import { CreateStudySessionDTO } from './dtos/createStudySessions.dto';
 import { UpdateStudySessionDTO } from './dtos/updateStudySessions.dto';
+import { SaveSessionDto } from './dtos/save-session.dto';
 import { StudySessionsService } from './study-sessions.service';
 import { JwtAuthGuard } from 'src/auth/strategy/jwt-auth.guard';
+import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
+import { RequireFeatures } from 'src/auth/decorators/feature.decorator';
 import type { Request } from 'express';
 
 @UseGuards(JwtAuthGuard)
@@ -55,6 +58,14 @@ export class StudySessionsController {
     return this.studySessionsService.findStudySessions(userId);
   }
 
+  @Get('history')
+  @UseGuards(PermissionsGuard)
+  @RequireFeatures('SESSION_HISTORY')
+  getStudySessionsHistory(@Req() req: Request) {
+    const userId = req.user!.id;
+    return this.studySessionsService.findStudySessionsHistory(userId);
+  }
+
   @Get(':id')
   findStudySessionById(
     @Param('id', ParseIntPipe) id: number,
@@ -73,5 +84,11 @@ export class StudySessionsController {
     const userId = req.user!.id;
 
     return this.studySessionsService.deleteStudySession(id, userId);
+  }
+
+  @Post('save')
+  saveSession(@Req() req: Request, @Body() dto: SaveSessionDto) {
+    const userId = req.user!.id;
+    return this.studySessionsService.saveSession(userId, dto);
   }
 }
