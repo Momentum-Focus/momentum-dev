@@ -55,6 +55,33 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           userId,
         });
       }
+
+      // Tratamento especial para erros de configuração do Google OAuth
+      if (
+        message.includes('GOOGLE_CLIENT_ID') ||
+        message.includes('GOOGLE_CLIENT_SECRET') ||
+        message.includes('GOOGLE_REDIRECT_URI') ||
+        message.includes('MISSING_CLIENT_ID') ||
+        message.includes('MISSING_CLIENT_SECRET') ||
+        message.includes('Falha ao inicializar estratégia')
+      ) {
+        status = HttpStatus.INTERNAL_SERVER_ERROR;
+        message =
+          'Erro de configuração do Google OAuth. Verifique as variáveis de ambiente GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e GOOGLE_REDIRECT_URI.';
+
+        // Log detalhado
+        console.error('❌ Erro de configuração do Google OAuth:', {
+          message: exception.message,
+          stack: exception.stack,
+          url: request.url,
+          userId,
+          envCheck: {
+            GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? '✓' : '✗',
+            GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ? '✓' : '✗',
+            GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI || '✗',
+          },
+        });
+      }
     }
 
     await this.loggingService.createLog(
