@@ -5,6 +5,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { HttpModule } from '@nestjs/axios';
 import { MediaController } from './media.controller';
 import { MediaService } from './media.service';
+import { UploadController } from './upload.controller';
+import { UploadService } from './upload.service';
 import { UserModule } from 'src/user/user.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { SpotifyOAuthStrategy } from './strategy/spotify.strategy';
@@ -30,13 +32,14 @@ import { PlanModule } from 'src/plan/plan.module';
       maxRedirects: 5,
     }),
   ],
-  controllers: [MediaController],
+  controllers: [MediaController, UploadController],
   providers: [
     MediaService,
+    UploadService,
     SpotifyOAuthStrategy,
     GoogleYouTubeStrategy,
     YouTubeService,
   ],
-  exports: [MediaService, YouTubeService],
+  exports: [MediaService, UploadService, YouTubeService],
 })
 export class MediaModule {}
