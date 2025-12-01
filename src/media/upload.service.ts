@@ -25,7 +25,9 @@ export class UploadService {
       );
     }
 
-    this.supabase = createClient(supabaseUrl, supabaseKey);
+    // Normalizar URL do Supabase (remover trailing slash se houver)
+    const normalizedUrl = supabaseUrl.replace(/\/$/, '');
+    this.supabase = createClient(normalizedUrl, supabaseKey);
   }
 
   async uploadFile(
@@ -116,6 +118,21 @@ export class UploadService {
       throw new BadRequestException('Erro ao obter URL pública do arquivo');
     }
 
+    // Normalizar a URL para evitar duplicação
+    let finalUrl = publicUrl;
+
+    // Se a URL contém o domínio duplicado, corrigir
+    const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, '');
+    if (supabaseUrl && finalUrl.includes(supabaseUrl + supabaseUrl)) {
+      // Remover duplicação
+      finalUrl = finalUrl.replace(supabaseUrl + supabaseUrl, supabaseUrl);
+    }
+
+    // Garantir que começa com http
+    if (!finalUrl.startsWith('http')) {
+      finalUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${filePath}`;
+    }
+
     // Salvar no banco de dados
     // Nota: Áudios são tratados como IMAGE no banco por enquanto
     // (o enum MediaType só tem IMAGE e VIDEO)
@@ -123,7 +140,7 @@ export class UploadService {
 
     const savedMedia = await this.prisma.media.create({
       data: {
-        url: publicUrl,
+        url: finalUrl,
         type: mediaType,
         userId,
         isActive: false, // Novo upload começa como inativo
@@ -188,7 +205,30 @@ export class UploadService {
       const {
         data: { publicUrl },
       } = this.supabase.storage.from(bucketName).getPublicUrl(filePath);
-      return publicUrl;
+
+      if (!publicUrl) {
+        return null;
+      }
+
+      // Normalizar a URL para evitar duplicação
+      let normalizedUrl = publicUrl;
+
+      // Se a URL contém o domínio duplicado, corrigir
+      const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, '');
+      if (supabaseUrl && normalizedUrl.includes(supabaseUrl + supabaseUrl)) {
+        // Remover duplicação
+        normalizedUrl = normalizedUrl.replace(
+          supabaseUrl + supabaseUrl,
+          supabaseUrl,
+        );
+      }
+
+      // Garantir que começa com http
+      if (!normalizedUrl.startsWith('http')) {
+        normalizedUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${filePath}`;
+      }
+
+      return normalizedUrl;
     };
 
     // Retorna URLs para todas as extensões possíveis
