@@ -30,6 +30,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { PlanService } from 'src/plan/plan.service';
 import { RequireFeatures } from 'src/auth/decorators/feature.decorator';
 import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
+import { multerConfig } from './multer.config';
 
 @Controller('media')
 export class MediaController {
@@ -2198,7 +2199,7 @@ export class MediaController {
 
   @Post('background/upload')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', multerConfig))
   async uploadBackground(
     @Request() req: any,
     @UploadedFile() file?: Express.Multer.File,

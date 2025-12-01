@@ -63,3 +63,4 @@ export class InsightsReportDTO extends OverviewReportDTO {
   recommendations: RecommendationDTO[];
 }
 
+
