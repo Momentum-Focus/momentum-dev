@@ -7,6 +7,7 @@ import { MediaController } from './media.controller';
 import { MediaService } from './media.service';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
+import { FocusSoundsService } from './focus-sounds.service';
 import { UserModule } from 'src/user/user.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { SpotifyOAuthStrategy } from './strategy/spotify.strategy';
@@ -36,6 +37,7 @@ import { PlanModule } from 'src/plan/plan.module';
   providers: [
     MediaService,
     UploadService,
+    FocusSoundsService,
     SpotifyOAuthStrategy,
     GoogleYouTubeStrategy,
     YouTubeService,
