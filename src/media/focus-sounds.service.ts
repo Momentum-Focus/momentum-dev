@@ -15,7 +15,9 @@ export class FocusSoundsService {
       );
     }
 
-    this.supabase = createClient(supabaseUrl, supabaseKey);
+    // Normalizar URL do Supabase (remover trailing slash se houver)
+    const normalizedUrl = supabaseUrl.replace(/\/$/, '');
+    this.supabase = createClient(normalizedUrl, supabaseKey);
   }
 
   /**
@@ -62,7 +64,16 @@ export class FocusSoundsService {
       throw new BadRequestException('Erro ao obter URL pública do áudio');
     }
 
-    return { url: publicUrl };
+    // Garantir que a URL está correta (sem duplicação)
+    // Se a URL já começar com http, usar diretamente
+    // Caso contrário, construir manualmente
+    let finalUrl = publicUrl;
+    if (!publicUrl.startsWith('http')) {
+      const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, ''); // Remove trailing slash
+      finalUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${filePath}`;
+    }
+
+    return { url: finalUrl };
   }
 
   /**
@@ -86,7 +97,32 @@ export class FocusSoundsService {
       const {
         data: { publicUrl },
       } = this.supabase.storage.from(bucketName).getPublicUrl(filePath);
-      return publicUrl;
+
+      if (!publicUrl) {
+        return null;
+      }
+
+      // Normalizar a URL para evitar duplicação
+      // O getPublicUrl do Supabase já retorna a URL completa
+      // Mas pode haver problemas se a URL do Supabase tiver trailing slash
+      let normalizedUrl = publicUrl;
+
+      // Se a URL contém o domínio duplicado, corrigir
+      const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, '');
+      if (supabaseUrl && normalizedUrl.includes(supabaseUrl + supabaseUrl)) {
+        // Remover duplicação
+        normalizedUrl = normalizedUrl.replace(
+          supabaseUrl + supabaseUrl,
+          supabaseUrl,
+        );
+      }
+
+      // Garantir que começa com http
+      if (!normalizedUrl.startsWith('http')) {
+        normalizedUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${filePath}`;
+      }
+
+      return normalizedUrl;
     };
 
     return {
