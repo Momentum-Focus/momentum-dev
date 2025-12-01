@@ -164,6 +164,44 @@ export class UploadService {
     return media;
   }
 
+  /**
+   * Retorna as URLs dos backgrounds pré-definidos do Supabase Storage
+   * Os backgrounds estão na pasta "background-defined/" do bucket "Backgrounds"
+   * Retorna URLs para diferentes extensões possíveis (jpg, png, webp)
+   */
+  async getPresetBackgroundUrls(): Promise<{
+    forest: string | null;
+    ocean: string | null;
+    mountains: string | null;
+    library: string | null;
+    minimal: string | null;
+  }> {
+    const bucketName = 'Backgrounds';
+
+    // Retorna as URLs públicas dos backgrounds pré-definidos
+    // Tenta jpg primeiro, depois png, depois webp
+    const getUrl = (
+      backgroundId: string,
+      extension: string = 'jpg',
+    ): string => {
+      const filePath = `background-defined/${backgroundId}.${extension}`;
+      const {
+        data: { publicUrl },
+      } = this.supabase.storage.from(bucketName).getPublicUrl(filePath);
+      return publicUrl;
+    };
+
+    // Retorna URLs para todas as extensões possíveis
+    // O frontend tentará carregar e usará fallback se não funcionar
+    return {
+      forest: getUrl('forest', 'jpg'), // Tenta jpg primeiro
+      ocean: getUrl('ocean', 'jpg'),
+      mountains: getUrl('mountains', 'jpg'),
+      library: getUrl('library', 'jpg'),
+      minimal: getUrl('minimal', 'jpg'),
+    };
+  }
+
   async deleteMedia(mediaId: number, userId: number): Promise<void> {
     // Verificar se a mídia pertence ao usuário
     const media = await this.prisma.media.findFirst({
