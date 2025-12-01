@@ -38,6 +38,37 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       message = exception.message;
       stackTrace = exception.stack;
 
+      // Tratamento especial para erros do Multer (upload de arquivos)
+      if (
+        message.includes('File too large') ||
+        message.includes('LIMIT_FILE_SIZE') ||
+        message.includes('too large')
+      ) {
+        status = HttpStatus.BAD_REQUEST;
+        message = 'Arquivo muito grande. O tamanho máximo permitido é 50MB.';
+
+        console.error('Erro de tamanho de arquivo:', {
+          message: exception.message,
+          url: request.url,
+          userId,
+          contentLength: request.headers['content-length'],
+        });
+      } else if (
+        message.includes('Unexpected field') ||
+        message.includes('LIMIT_UNEXPECTED_FILE')
+      ) {
+        status = HttpStatus.BAD_REQUEST;
+        message =
+          'Campo de arquivo inválido. Certifique-se de que o campo do formulário se chama "file".';
+      } else if (
+        message.includes('MulterError') ||
+        message.includes('Multer')
+      ) {
+        status = HttpStatus.BAD_REQUEST;
+        message =
+          'Erro ao processar o arquivo. Verifique se o arquivo é válido e tente novamente.';
+      }
+
       // Tratamento especial para erros do Passport/Spotify
       if (
         message.includes('failed to fetch user profile') ||

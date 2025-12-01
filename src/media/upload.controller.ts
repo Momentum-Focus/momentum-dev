@@ -33,7 +33,18 @@ export class UploadController {
     @UploadedFile() file: Express.Multer.File,
     @Request() req: ExpressRequest,
   ) {
+    // Verificar se o arquivo foi recebido
     if (!file) {
+      // Verificar se o erro foi por limite de tamanho
+      const contentLength = req.headers['content-length'];
+      if (contentLength) {
+        const sizeInMB = parseInt(contentLength) / (1024 * 1024);
+        if (sizeInMB > 50) {
+          throw new BadRequestException(
+            `Arquivo muito grande (${sizeInMB.toFixed(2)}MB). O tamanho máximo permitido é 50MB.`,
+          );
+        }
+      }
       throw new BadRequestException('Arquivo não fornecido');
     }
 

@@ -17,8 +17,10 @@ async function bootstrap() {
     app.useGlobalFilters(new GlobalExceptionFilter(logsService));
 
     // Habilitar CORS
-    let allowedOrigins = process.env.CORS_ORIGIN
-      ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
+    // Usa FRONTEND_URL se disponível, senão usa CORS_ORIGIN (compatibilidade)
+    const frontendUrl = process.env.FRONTEND_URL || process.env.CORS_ORIGIN;
+    let allowedOrigins = frontendUrl
+      ? frontendUrl.split(',').map((origin) => origin.trim())
       : ['http://localhost:8080', 'https://momentum-rouge.vercel.app'];
 
     // Normalizar origens: adicionar https:// apenas se não tiver protocolo
@@ -59,8 +61,11 @@ async function bootstrap() {
         'Authorization',
         'Accept',
         'X-Requested-With',
+        'Content-Length',
+        'Cache-Control',
+        'X-File-Name',
       ],
-      exposedHeaders: ['Content-Length', 'Content-Type'],
+      exposedHeaders: ['Content-Length', 'Content-Type', 'Content-Disposition'],
       preflightContinue: false,
       optionsSuccessStatus: 204,
       maxAge: 86400, // 24 horas
