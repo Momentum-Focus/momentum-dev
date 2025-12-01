@@ -17,9 +17,9 @@ import { JwtAuthGuard } from 'src/auth/strategy/jwt-auth.guard';
 import { UploadService } from './upload.service';
 import { FocusSoundsService } from './focus-sounds.service';
 import type { Request as ExpressRequest } from 'express';
+import { multerConfig } from './multer.config';
 
 @Controller('media')
-@UseGuards(JwtAuthGuard)
 export class UploadController {
   constructor(
     private readonly uploadService: UploadService,
@@ -27,7 +27,8 @@ export class UploadController {
   ) {}
 
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file', multerConfig))
   async uploadFile(
     @UploadedFile() file: Express.Multer.File,
     @Request() req: ExpressRequest,
@@ -46,6 +47,7 @@ export class UploadController {
   }
 
   @Get('user')
+  @UseGuards(JwtAuthGuard)
   async getUserMedia(@Request() req: ExpressRequest) {
     const userId = (req.user as any)?.id;
 
@@ -57,6 +59,7 @@ export class UploadController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
   async deleteMedia(
     @Param('id', ParseIntPipe) mediaId: number,
     @Request() req: ExpressRequest,
@@ -72,7 +75,8 @@ export class UploadController {
   }
 
   @Post('focus-sounds/upload')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file', multerConfig))
   async uploadFocusSound(
     @UploadedFile() file: Express.Multer.File,
     @Body('soundType') soundType: string,
@@ -99,5 +103,10 @@ export class UploadController {
   @Get('focus-sounds/urls')
   async getFocusSoundUrls() {
     return await this.focusSoundsService.getFocusSoundUrls();
+  }
+
+  @Get('preset-backgrounds/urls')
+  async getPresetBackgroundUrls() {
+    return await this.uploadService.getPresetBackgroundUrls();
   }
 }
