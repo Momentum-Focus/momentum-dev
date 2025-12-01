@@ -206,39 +206,52 @@ export class UploadService {
         data: { publicUrl },
       } = this.supabase.storage.from(bucketName).getPublicUrl(filePath);
 
+      // O getPublicUrl do Supabase sempre retorna uma URL válida
       if (!publicUrl) {
         return null;
       }
 
-      // Normalizar a URL para evitar duplicação
-      let normalizedUrl = publicUrl;
+      let normalizedUrl = publicUrl.trim();
 
-      // Se a URL contém o domínio duplicado, corrigir
+      // Corrigir duplicação de domínio (ex: https://xxx.supabase.cohttps//xxx.supabase.co)
+      // Padrão específico: https://xxx.supabase.cohttps//xxx.supabase.co
+      normalizedUrl = normalizedUrl.replace(
+        /(https?:\/\/[^\/]+)https\/\//g,
+        '$1/',
+      );
+
+      // Corrigir duplicação completa do domínio (ex: https://xxx.supabase.cohttps://xxx.supabase.co)
       const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, '');
-      if (supabaseUrl && normalizedUrl.includes(supabaseUrl + supabaseUrl)) {
-        // Remover duplicação
-        normalizedUrl = normalizedUrl.replace(
-          supabaseUrl + supabaseUrl,
-          supabaseUrl,
-        );
-      }
-
-      // Garantir que começa com http
-      if (!normalizedUrl.startsWith('http')) {
-        normalizedUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${filePath}`;
+      if (supabaseUrl) {
+        // Verificar duplicação exata do domínio
+        const doubleUrl = supabaseUrl + supabaseUrl;
+        if (normalizedUrl.includes(doubleUrl)) {
+          normalizedUrl = normalizedUrl.replace(doubleUrl, supabaseUrl);
+        }
       }
 
       return normalizedUrl;
     };
 
     // Retorna URLs para todas as extensões possíveis
-    // O frontend tentará carregar e usará fallback se não funcionar
+    // Tenta diferentes extensões até encontrar uma que exista
+    const tryGetUrl = (backgroundId: string): string | null => {
+      const extensions = ['jpg', 'png', 'webp', 'jpeg'];
+      for (const ext of extensions) {
+        const url = getUrl(backgroundId, ext);
+        if (url) {
+          return url;
+        }
+      }
+      return null;
+    };
+
     return {
-      forest: getUrl('forest', 'jpg'), // Tenta jpg primeiro
-      ocean: getUrl('ocean', 'jpg'),
-      mountains: getUrl('mountains', 'jpg'),
-      library: getUrl('library', 'jpg'),
-      minimal: getUrl('minimal', 'jpg'),
+      forest: tryGetUrl('forest'),
+      ocean: tryGetUrl('ocean'),
+      mountains: tryGetUrl('mountains'),
+      library: tryGetUrl('library'),
+      minimal: tryGetUrl('minimal'),
     };
   }
 
