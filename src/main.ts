@@ -2,10 +2,16 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { LogsService } from './logs/logs.service';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
+
+    // Configurar limites de tamanho para uploads
+    // 50MB para JSON e URL encoded (para requisições grandes)
+    app.use(json({ limit: '50mb' }));
+    app.use(urlencoded({ extended: true, limit: '50mb' }));
 
     const logsService = app.get(LogsService);
     app.useGlobalFilters(new GlobalExceptionFilter(logsService));
