@@ -92,34 +92,34 @@ export class FocusSoundsService {
     // Retorna as URLs públicas dos áudios
     // Se os arquivos não existirem ainda, as URLs ainda serão geradas
     // O frontend pode verificar se o arquivo existe ao tentar reproduzir
-    const getUrl = (soundType: string) => {
+    const getUrl = (soundType: string): string | null => {
       const filePath = `focus-sounds/${soundType}.mp3`;
       const {
         data: { publicUrl },
       } = this.supabase.storage.from(bucketName).getPublicUrl(filePath);
 
+      // O getPublicUrl do Supabase sempre retorna uma URL válida
       if (!publicUrl) {
         return null;
       }
 
-      // Normalizar a URL para evitar duplicação
-      // O getPublicUrl do Supabase já retorna a URL completa
-      // Mas pode haver problemas se a URL do Supabase tiver trailing slash
-      let normalizedUrl = publicUrl;
+      let normalizedUrl = publicUrl.trim();
 
-      // Se a URL contém o domínio duplicado, corrigir
+      // Corrigir duplicação de domínio (ex: https://xxx.supabase.cohttps//xxx.supabase.co)
+      // Padrão específico: https://xxx.supabase.cohttps//xxx.supabase.co
+      normalizedUrl = normalizedUrl.replace(
+        /(https?:\/\/[^\/]+)https\/\//g,
+        '$1/',
+      );
+
+      // Corrigir duplicação completa do domínio (ex: https://xxx.supabase.cohttps://xxx.supabase.co)
       const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, '');
-      if (supabaseUrl && normalizedUrl.includes(supabaseUrl + supabaseUrl)) {
-        // Remover duplicação
-        normalizedUrl = normalizedUrl.replace(
-          supabaseUrl + supabaseUrl,
-          supabaseUrl,
-        );
-      }
-
-      // Garantir que começa com http
-      if (!normalizedUrl.startsWith('http')) {
-        normalizedUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${filePath}`;
+      if (supabaseUrl) {
+        // Verificar duplicação exata do domínio
+        const doubleUrl = supabaseUrl + supabaseUrl;
+        if (normalizedUrl.includes(doubleUrl)) {
+          normalizedUrl = normalizedUrl.replace(doubleUrl, supabaseUrl);
+        }
       }
 
       return normalizedUrl;
