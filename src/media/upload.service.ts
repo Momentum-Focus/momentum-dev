@@ -200,7 +200,7 @@ export class UploadService {
     const getUrl = (
       backgroundId: string,
       extension: string = 'jpg',
-    ): string => {
+    ): string | null => {
       const filePath = `background-defined/${backgroundId}.${extension}`;
       const {
         data: { publicUrl },
